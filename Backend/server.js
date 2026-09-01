@@ -12,11 +12,23 @@ const { initBot } = require('./bot/telegramBot');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+const fs = require('fs');
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve Production Frontend Build if available
+const frontendDistPath = path.join(__dirname, '../Frontend/dist');
+const backendDistPath = path.join(__dirname, 'dist');
+
+if (fs.existsSync(frontendDistPath)) {
+  app.use(express.static(frontendDistPath));
+} else if (fs.existsSync(backendDistPath)) {
+  app.use(express.static(backendDistPath));
+}
 
 // Health Check
 app.get('/api/health', (req, res) => {
@@ -62,6 +74,18 @@ app.put('/api/admin/referral-settings', adminController.updateReferralSettings);
 app.get('/api/admin/payout-methods', adminController.getPayoutMethods);
 app.post('/api/admin/payout-methods', adminController.createPayoutMethod);
 app.put('/api/admin/payout-methods/:id', adminController.updatePayoutMethod);
+
+// SPA Wildcard Route Fallback for Frontend Single Page App
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  if (fs.existsSync(path.join(frontendDistPath, 'index.html'))) {
+    return res.sendFile(path.join(frontendDistPath, 'index.html'));
+  }
+  if (fs.existsSync(path.join(backendDistPath, 'index.html'))) {
+    return res.sendFile(path.join(backendDistPath, 'index.html'));
+  }
+  next();
+});
 
 // Start Server
 async function startServer() {

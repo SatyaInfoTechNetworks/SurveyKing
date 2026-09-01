@@ -1,0 +1,19 @@
+{
+  "name": "survey-king-fullstack",
+  "version": "1.0.0",
+  "description": "Survey King 👑 — Telegram Web App & Paid Surveys Platform",
+  "main": "Backend/server.js",
+  "scripts": {
+    "postinstall": "npm --prefix Frontend install && npm --prefix Backend install",
+    "build": "npm --prefix Frontend run build",
+    "start": "node Backend/server.js"
+  },
+  "keywords": [
+    "surveyking",
+    "telegram-bot",
+    "cpx-research",
+    "rewards"
+  ],
+  "author": "Satya InfoTech Networks",
+  "license": "MIT"
+}
