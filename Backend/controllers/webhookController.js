@@ -258,6 +258,170 @@ async function logPostback({ provider, transId, tgUserId, offerId, statusParam, 
   }
 }
 
+// -------------------------------------------------------------------
+// TIMEWALL.IO POSTBACK WEBHOOK HANDLER
+// -------------------------------------------------------------------
+const crypto = require('crypto');
+
+async function handleTimeWallWebhook(req, res) {
+  const startTime = Date.now();
+  const provider = 'timewall';
+
+  // Extract TimeWall Macro Parameters
+  const userId = (req.query.userId || req.query.user_id || req.body.userId || req.body.user_id || '').toString().trim();
+  const txId = (req.query.txId || req.query.transactionID || req.query.txid || req.body.txId || req.body.transactionID || '').toString().trim();
+  const rawRevenue = req.query.revenue !== undefined ? String(req.query.revenue).trim() : (req.body.revenue !== undefined ? String(req.body.revenue).trim() : '0');
+  const revenueUsd = parseFloat(rawRevenue) || 0;
+  
+  const rawCurrency = req.query.currency || req.query.currencyAmount || req.body.currency || req.body.currencyAmount;
+  // If currency amount is passed in query, use it; otherwise compute from revenueUsd ($1.00 = 4,500 Coins)
+  let coinAmount = rawCurrency ? Math.abs(parseFloat(rawCurrency)) : Math.round(Math.abs(revenueUsd) * 4500);
+
+  const incomingHash = req.query.hash || req.body.hash;
+  const rawType = (req.query.type || req.body.type || 'credit').toLowerCase();
+  const isChargeback = (rawType === 'chargeback' || revenueUsd < 0);
+  const isHold = (rawType === 'hold' || rawType === 'hold_cancelled');
+  const offerName = req.query.offerName || req.query.offername || req.body.offerName || 'TimeWall Task';
+  const reason = req.query.reason || req.body.reason || '';
+
+  const clientIp = req.clientIp || req.headers['x-forwarded-for']?.split(',')[0].trim() || req.headers['cf-connecting-ip'] || req.socket.remoteAddress || '127.0.0.1';
+
+  console.log(`====================================================`);
+  console.log(`⏱️ [TIMEWALL POSTBACK WEBHOOK] Timestamp: ${new Date().toISOString()}`);
+  console.log(`📡 Provider: TIMEWALL | TxId: ${txId || 'N/A'} | Type: ${rawType.toUpperCase()}`);
+  console.log(`👤 User ID: ${userId || 'N/A'} | Revenue: $${rawRevenue} | Coins: ${coinAmount}`);
+  console.log(`🌐 IP: ${clientIp}`);
+  console.log(`====================================================`);
+
+  // Verify TimeWall SHA256 Hash if provided: hash("sha256", userID . revenue . SecretKey)
+  const timeWallSecretKey = process.env.TIMEWALL_SECRET_KEY || 'd1180f52115620445ee622e4fb764f2d';
+  if (incomingHash && userId && rawRevenue) {
+    const expectedHash = crypto.createHash('sha256').update(`${userId}${rawRevenue}${timeWallSecretKey}`).digest('hex');
+    if (incomingHash.toLowerCase() !== expectedHash.toLowerCase()) {
+      console.warn(`⚠️ [TIMEWALL] Hash mismatch! Incoming: ${incomingHash} | Expected: ${expectedHash}`);
+    } else {
+      console.log(`🔒 [TIMEWALL] SHA256 Hash Verified!`);
+    }
+  }
+
+  // Handle Empty Ping / Test Validator
+  if (!txId && !userId) {
+    await logPostback({ provider: 'TimeWall', transId: 'TEST_PING', tgUserId: '0', offerId: offerName, statusParam: 'PING_OK', rawStatus: rawType, amountLocal: 0, amountUsd: 0, clientIp, idempotencyStatus: 'PING_OK', errorReason: null, walletCredited: 0, startTime });
+    return res.status(200).send('OK');
+  }
+
+  // Hold states: Acknowledge with 200 OK without awarding/deducting wallet balance
+  if (isHold) {
+    console.log(`ℹ️ [TIMEWALL] Hold state received: ${rawType} for Tx: ${txId}. Acknowledged.`);
+    await logPostback({ provider: 'TimeWall', transId: txId, tgUserId: userId, offerId: offerName, statusParam: rawType.toUpperCase(), rawStatus: rawType, amountLocal: coinAmount, amountUsd: revenueUsd, clientIp, idempotencyStatus: 'HOLD_ACK', errorReason: null, walletCredited: 0, startTime });
+    return res.status(200).send('OK');
+  }
+
+  try {
+    // 1. Check Idempotency (prevent duplicate crediting)
+    const existingTx = await db.query(
+      `SELECT * FROM wallet_transactions WHERE reference_id = ?`,
+      [`TW_${txId}`]
+    );
+
+    if (!isChargeback && existingTx.length > 0) {
+      console.log(`⚠️ [TIMEWALL DUPLICATE] Transaction ${txId} already processed.`);
+      await logPostback({ provider: 'TimeWall', transId: txId, tgUserId: userId, offerId: offerName, statusParam: 'DUPLICATE', rawStatus: rawType, amountLocal: coinAmount, amountUsd: revenueUsd, clientIp, idempotencyStatus: 'DUPLICATE', errorReason: 'Already credited', walletCredited: 0, startTime });
+      return res.status(200).send('OK');
+    }
+
+    // 2. Lookup or Auto-Create User
+    let user = null;
+    if (userId) {
+      const users = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [String(userId)]);
+      if (users.length > 0) {
+        user = users[0];
+      } else {
+        const userRefCode = 'SK' + Math.random().toString(36).substring(2, 7).toUpperCase();
+        try {
+          await db.execute(
+            `INSERT INTO users (telegram_user_id, name, username, balance, referral_code, status)
+             VALUES (?, 'TimeWall User', 'timewall_user', 0.00, ?, 'ACTIVE')`,
+            [String(userId), userRefCode]
+          );
+          const createdUsers = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [String(userId)]);
+          if (createdUsers.length > 0) user = createdUsers[0];
+        } catch (insertErr) {
+          const existing = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [String(userId)]);
+          if (existing.length > 0) user = existing[0];
+        }
+      }
+    }
+
+    if (!user) {
+      console.log(`ℹ️ Test postback received without matching DB user: ${userId}`);
+      await logPostback({ provider: 'TimeWall', transId: txId, tgUserId: userId, offerId: offerName, statusParam: 'TEST_SUCCESS', rawStatus: rawType, amountLocal: coinAmount, amountUsd: revenueUsd, clientIp, idempotencyStatus: 'TEST_SUCCESS', errorReason: null, walletCredited: 0, startTime });
+      return res.status(200).send('OK');
+    }
+
+    // 3. Handle Chargeback / Reversal
+    if (isChargeback) {
+      console.log(`🔄 [TIMEWALL CHARGEBACK] Deducting ${coinAmount} Coins for User ${user.id} (Tx: ${txId})...`);
+
+      const existingChargeback = await db.query(
+        `SELECT * FROM wallet_transactions WHERE reference_id = ?`,
+        [`TW_REV_${txId}`]
+      );
+      if (existingChargeback.length > 0) {
+        console.log(`ℹ️ [TIMEWALL] Duplicate chargeback already applied for Tx: ${txId}`);
+        await logPostback({ provider: 'TimeWall', transId: txId, tgUserId: user.telegram_user_id, offerId: offerName, statusParam: 'CANCELED', rawStatus: rawType, amountLocal: coinAmount, amountUsd: revenueUsd, clientIp, idempotencyStatus: 'DUPLICATE_REVERSAL', errorReason: 'Already reversed', walletCredited: 0, startTime });
+        return res.status(200).send('OK');
+      }
+
+      const currentBal = parseFloat(user.balance || 0);
+      const newBal = Math.max(0, currentBal - coinAmount);
+
+      await db.execute(`UPDATE users SET balance = ? WHERE id = ?`, [newBal, user.id]);
+
+      await db.execute(
+        `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
+         VALUES (?, 'SURVEY_REVERSAL', ?, ?, ?)`,
+        [user.id, -coinAmount, `TW_REV_${txId}`, `TimeWall Chargeback (Trans #${txId}) ${reason ? `- ${reason}` : ''}`.trim()]
+      );
+
+      notifySurveyReversal(user.telegram_user_id, coinAmount, newBal, txId);
+
+      await logPostback({ provider: 'TimeWall', transId: txId, tgUserId: user.telegram_user_id, offerId: offerName, statusParam: 'CANCELED', rawStatus: rawType, amountLocal: coinAmount, amountUsd: revenueUsd, clientIp, idempotencyStatus: 'REVERSED', errorReason: reason || null, walletCredited: 0, startTime });
+      return res.status(200).send('OK');
+    }
+
+    // 4. Handle Successful Credit
+    const currentBalance = parseFloat(user.balance || 0);
+    const newBalance = currentBalance + coinAmount;
+
+    await db.execute(`UPDATE users SET balance = ? WHERE id = ?`, [newBalance, user.id]);
+
+    await db.execute(
+      `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
+       VALUES (?, 'SURVEY_REWARD', ?, ?, ?)`,
+      [user.id, coinAmount, `TW_${txId}`, `TimeWall: ${offerName} (Trans #${txId})`]
+    );
+
+    // Record survey participation
+    await db.execute(
+      `INSERT INTO survey_participations (user_id, survey_id, participation_id, provider, reward, status, started_at, completed_at)
+       VALUES (?, ?, ?, 'TimeWall', ?, 'COMPLETED', NOW(), NOW())`,
+      [user.id, `TW_${txId}`, txId, coinAmount]
+    );
+
+    notifySurveyReward(user.telegram_user_id, coinAmount, newBalance, offerName);
+
+    await logPostback({ provider: 'TimeWall', transId: txId, tgUserId: user.telegram_user_id, offerId: offerName, statusParam: 'COMPLETED', rawStatus: rawType, amountLocal: coinAmount, amountUsd: revenueUsd, clientIp, idempotencyStatus: 'SUCCESS', errorReason: null, walletCredited: 1, startTime });
+
+    return res.status(200).send('OK');
+  } catch (err) {
+    console.error('Error handling TimeWall postback:', err);
+    await logPostback({ provider: 'TimeWall', transId: txId, tgUserId: userId, offerId: offerName, statusParam: 'ERROR', rawStatus: rawType, amountLocal: coinAmount, amountUsd: revenueUsd, clientIp, idempotencyStatus: 'ERROR', errorReason: err.message, walletCredited: 0, startTime });
+    return res.status(200).send('OK');
+  }
+}
+
 module.exports = {
-  handleWebhook
+  handleWebhook,
+  handleTimeWallWebhook
 };

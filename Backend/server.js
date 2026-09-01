@@ -95,11 +95,15 @@ app.get('/api/telegram/transactions', telegramController.getTransactions);
 app.get('/api/telegram/referrals', telegramController.getReferrals);
 app.post('/api/telegram/withdraw', telegramController.requestWithdrawal);
 
-// Webhook APIs (CPX Research & Partners)
+// Webhook APIs (CPX Research & TimeWall)
 app.all('/cpx', webhookController.handleWebhook);
 app.all('/api/cpx', webhookController.handleWebhook);
 app.all('/postback', webhookController.handleWebhook);
 app.all('/api/postback', webhookController.handleWebhook);
+app.all('/postback/timewall', webhookController.handleTimeWallWebhook);
+app.all('/api/postback/timewall', webhookController.handleTimeWallWebhook);
+app.all('/timewall', webhookController.handleTimeWallWebhook);
+app.all('/api/timewall', webhookController.handleTimeWallWebhook);
 app.all('/api/webhooks/cpx', webhookController.handleWebhook);
 app.all('/api/webhooks/surveys/cpx', webhookController.handleWebhook);
 app.all('/api/webhooks/surveys/:provider', webhookController.handleWebhook);
