@@ -86,6 +86,7 @@ function initBot() {
         };
 
         await bot.sendMessage(chatId, welcomeText, keyboard);
+        await recordNotificationLog(tgUserId, 'BOT_WELCOME', welcomeText, 'SENT', null);
       } catch (err) {
         console.error('Bot /start handler error:', err);
         await bot.sendMessage(chatId, '👑 Welcome to Survey King! Click below to start earning.', {
@@ -138,21 +139,33 @@ function initBot() {
 // NOTIFICATION SYSTEM FOR USER EVENTS
 // ---------------------------------------------------------
 
+async function recordNotificationLog(telegramUserId, type, message, status, errorMessage) {
+  try {
+    await db.execute(
+      `INSERT INTO telegram_notifications (telegram_user_id, type, message, status, error_message)
+       VALUES (?, ?, ?, ?, ?)`,
+      [String(telegramUserId), type, message, status, errorMessage || null]
+    );
+  } catch (e) {
+    console.warn('Could not record notification log to DB:', e.message);
+  }
+}
+
 /**
  * Notify user on Telegram when Survey Reward Coins are credited
  */
 async function notifySurveyReward(telegramUserId, surveyTitle, rewardCoins, newBalanceCoins) {
   if (!bot || !telegramUserId) return;
+  const rupees = (rewardCoins / 100).toFixed(2);
+  const newRupees = (newBalanceCoins / 100).toFixed(2);
+
+  const message = `🎉 *SURVEY REWARD CREDITED!*\n\n` +
+    `🎯 *Survey:* ${surveyTitle || 'Paid Survey'}\n` +
+    `🪙 *Reward Earned:* +${rewardCoins.toLocaleString()} Coins (≈ ₹${rupees} INR)\n\n` +
+    `💰 *Updated Balance:* ${newBalanceCoins.toLocaleString()} Coins (≈ ₹${newRupees} INR)\n\n` +
+    `Keep taking surveys to earn more! 🚀`;
+
   try {
-    const rupees = (rewardCoins / 100).toFixed(2);
-    const newRupees = (newBalanceCoins / 100).toFixed(2);
-
-    const message = `🎉 *SURVEY REWARD CREDITED!*\n\n` +
-      `🎯 *Survey:* ${surveyTitle || 'Paid Survey'}\n` +
-      `🪙 *Reward Earned:* +${rewardCoins.toLocaleString()} Coins (≈ ₹${rupees} INR)\n\n` +
-      `💰 *Updated Balance:* ${newBalanceCoins.toLocaleString()} Coins (≈ ₹${newRupees} INR)\n\n` +
-      `Keep taking surveys to earn more! 🚀`;
-
     const webAppUrl = process.env.WEBAPP_URL || 'https://surveyking.satyainfotechnetworks.com';
     await bot.sendMessage(telegramUserId, message, {
       parse_mode: 'Markdown',
@@ -160,8 +173,10 @@ async function notifySurveyReward(telegramUserId, surveyTitle, rewardCoins, newB
         inline_keyboard: [[{ text: '🎯 Take Next Survey', web_app: { url: `${webAppUrl}/app` } }]]
       }
     });
+    await recordNotificationLog(telegramUserId, 'SURVEY_REWARD', message, 'SENT', null);
     console.log(`📲 Telegram Notification Sent to User ${telegramUserId} for Survey Reward (+${rewardCoins} Coins)`);
   } catch (err) {
+    await recordNotificationLog(telegramUserId, 'SURVEY_REWARD', message, 'FAILED', err.message);
     console.warn(`⚠️ Failed to send survey reward notification to ${telegramUserId}:`, err.message);
   }
 }
@@ -171,16 +186,16 @@ async function notifySurveyReward(telegramUserId, surveyTitle, rewardCoins, newB
  */
 async function notifyReferralReward(telegramUserId, rewardCoins, newBalanceCoins, friendName = 'a friend') {
   if (!bot || !telegramUserId) return;
+  const rupees = (rewardCoins / 100).toFixed(2);
+  const newRupees = (newBalanceCoins / 100).toFixed(2);
+
+  const message = `🎁 *REFERRAL BONUS CREDITED!*\n\n` +
+    `🎉 *Congratulations!* ${friendName} completed their first survey!\n` +
+    `🪙 *Referral Reward:* +${rewardCoins.toLocaleString()} Coins (≈ ₹${rupees} INR)\n\n` +
+    `💰 *Updated Balance:* ${newBalanceCoins.toLocaleString()} Coins (≈ ₹${newRupees} INR)\n\n` +
+    `Invite more friends to earn unlimited bonuses! 🚀`;
+
   try {
-    const rupees = (rewardCoins / 100).toFixed(2);
-    const newRupees = (newBalanceCoins / 100).toFixed(2);
-
-    const message = `🎁 *REFERRAL BONUS CREDITED!*\n\n` +
-      `🎉 *Congratulations!* ${friendName} completed their first survey!\n` +
-      `🪙 *Referral Reward:* +${rewardCoins.toLocaleString()} Coins (≈ ₹${rupees} INR)\n\n` +
-      `💰 *Updated Balance:* ${newBalanceCoins.toLocaleString()} Coins (≈ ₹${newRupees} INR)\n\n` +
-      `Invite more friends to earn unlimited bonuses! 🚀`;
-
     const webAppUrl = process.env.WEBAPP_URL || 'https://surveyking.satyainfotechnetworks.com';
     await bot.sendMessage(telegramUserId, message, {
       parse_mode: 'Markdown',
@@ -188,8 +203,10 @@ async function notifyReferralReward(telegramUserId, rewardCoins, newBalanceCoins
         inline_keyboard: [[{ text: '👥 Invite More Friends', web_app: { url: `${webAppUrl}/app` } }]]
       }
     });
+    await recordNotificationLog(telegramUserId, 'REFERRAL_REWARD', message, 'SENT', null);
     console.log(`📲 Telegram Notification Sent to User ${telegramUserId} for Referral Reward (+${rewardCoins} Coins)`);
   } catch (err) {
+    await recordNotificationLog(telegramUserId, 'REFERRAL_REWARD', message, 'FAILED', err.message);
     console.warn(`⚠️ Failed to send referral reward notification to ${telegramUserId}:`, err.message);
   }
 }
@@ -199,16 +216,18 @@ async function notifyReferralReward(telegramUserId, rewardCoins, newBalanceCoins
  */
 async function notifyWithdrawalApproved(telegramUserId, amountRupees, upiId, method = 'UPI') {
   if (!bot || !telegramUserId) return;
-  try {
-    const message = `✅ *WITHDRAWAL APPROVED & PROCESSED!*\n\n` +
-      `💳 *Method:* ${method}\n` +
-      `💵 *Amount:* ₹${parseFloat(amountRupees).toFixed(2)} INR\n` +
-      `📲 *Destination:* \`${upiId}\`\n\n` +
-      `Your payout has been transferred successfully! Thank you for using Survey King 👑`;
+  const message = `✅ *WITHDRAWAL APPROVED & PROCESSED!*\n\n` +
+    `💳 *Method:* ${method}\n` +
+    `💵 *Amount:* ₹${parseFloat(amountRupees).toFixed(2)} INR\n` +
+    `📲 *Destination:* \`${upiId}\`\n\n` +
+    `Your payout has been transferred successfully! Thank you for using Survey King 👑`;
 
+  try {
     await bot.sendMessage(telegramUserId, message, { parse_mode: 'Markdown' });
+    await recordNotificationLog(telegramUserId, 'WITHDRAWAL_APPROVED', message, 'SENT', null);
     console.log(`📲 Telegram Notification Sent to User ${telegramUserId} for Approved Withdrawal (₹${amountRupees})`);
   } catch (err) {
+    await recordNotificationLog(telegramUserId, 'WITHDRAWAL_APPROVED', message, 'FAILED', err.message);
     console.warn(`⚠️ Failed to send withdrawal approval notification to ${telegramUserId}:`, err.message);
   }
 }
@@ -218,15 +237,15 @@ async function notifyWithdrawalApproved(telegramUserId, amountRupees, upiId, met
  */
 async function notifyWithdrawalRejected(telegramUserId, refundCoins, upiId, method = 'UPI') {
   if (!bot || !telegramUserId) return;
+  const refundRupees = (refundCoins / 100).toFixed(2);
+
+  const message = `❌ *WITHDRAWAL REJECTED & REFUNDED*\n\n` +
+    `💳 *Method:* ${method}\n` +
+    `📲 *Destination:* \`${upiId}\`\n` +
+    `🔄 *Refunded Balance:* +${refundCoins.toLocaleString()} Coins (≈ ₹${refundRupees} INR)\n\n` +
+    `Your coins have been automatically refunded to your balance. Please check your payment details and request again in the app.`;
+
   try {
-    const refundRupees = (refundCoins / 100).toFixed(2);
-
-    const message = `❌ *WITHDRAWAL REJECTED & REFUNDED*\n\n` +
-      `💳 *Method:* ${method}\n` +
-      `📲 *Destination:* \`${upiId}\`\n` +
-      `🔄 *Refunded Balance:* +${refundCoins.toLocaleString()} Coins (≈ ₹${refundRupees} INR)\n\n` +
-      `Your coins have been automatically refunded to your balance. Please check your payment details and request again in the app.`;
-
     const webAppUrl = process.env.WEBAPP_URL || 'https://surveyking.satyainfotechnetworks.com';
     await bot.sendMessage(telegramUserId, message, {
       parse_mode: 'Markdown',
@@ -234,9 +253,26 @@ async function notifyWithdrawalRejected(telegramUserId, refundCoins, upiId, meth
         inline_keyboard: [[{ text: '💰 Open Balance in App', web_app: { url: `${webAppUrl}/app` } }]]
       }
     });
+    await recordNotificationLog(telegramUserId, 'WITHDRAWAL_REJECTED', message, 'SENT', null);
     console.log(`📲 Telegram Notification Sent to User ${telegramUserId} for Rejected Withdrawal Refund (+${refundCoins} Coins)`);
   } catch (err) {
+    await recordNotificationLog(telegramUserId, 'WITHDRAWAL_REJECTED', message, 'FAILED', err.message);
     console.warn(`⚠️ Failed to send withdrawal rejection notification to ${telegramUserId}:`, err.message);
+  }
+}
+
+/**
+ * Send broadcast announcement to all users or specific user
+ */
+async function sendBroadcast(telegramUserId, text) {
+  if (!bot) return false;
+  try {
+    await bot.sendMessage(telegramUserId, text, { parse_mode: 'Markdown' });
+    await recordNotificationLog(telegramUserId, 'ADMIN_BROADCAST', text, 'SENT', null);
+    return true;
+  } catch (err) {
+    await recordNotificationLog(telegramUserId, 'ADMIN_BROADCAST', text, 'FAILED', err.message);
+    return false;
   }
 }
 
@@ -245,5 +281,6 @@ module.exports = {
   notifySurveyReward,
   notifyReferralReward,
   notifyWithdrawalApproved,
-  notifyWithdrawalRejected
+  notifyWithdrawalRejected,
+  sendBroadcast
 };

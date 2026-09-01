@@ -4,7 +4,7 @@ import HomeTab from './components/HomeTab';
 import SurveysTab from './components/SurveysTab';
 import EarningsTab from './components/EarningsTab';
 import ProfileTab from './components/ProfileTab';
-import AdminPanel from './components/AdminPanel';
+import AdminLayout from './admin/layouts/AdminLayout';
 import LandingPage from './components/LandingPage';
 
 export default function App() {
@@ -224,46 +224,52 @@ export default function App() {
 
   return (
     <div style={{ width: '100%', minHeight: '100vh', position: 'relative', background: '#0a0e17' }}>
-      {/* Top Application Header Bar */}
-      <header style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 140,
-        background: 'rgba(10, 14, 23, 0.95)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        borderBottom: '1px solid var(--border-color)',
-        padding: '12px 16px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)'
-          }}>
-            <Crown size={20} color="#000" />
-          </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>
-            SURVEY KING 👑
-          </div>
-        </div>
-      </header>
-
       {showAdmin ? (
-        <AdminPanel
-          onClose={() => setShowAdmin(false)}
-          onRefreshData={() => user && loadUserData(user.telegramUserId)}
+        <AdminLayout
+          onExitAdmin={() => {
+            setShowAdmin(false);
+            setViewMode('app');
+            if (window.location.pathname.includes('/admin')) {
+              window.history.pushState({}, '', '/app');
+            }
+            if (user) loadUserData(user.telegramUserId);
+          }}
         />
       ) : (
-        <>
+        <div style={{ maxWidth: '480px', margin: '0 auto', minHeight: '100vh', background: 'var(--bg-primary)', position: 'relative', display: 'flex', flexDirection: 'column' }}>
+          {/* Top Application Header Bar */}
+          <header style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 140,
+            background: 'rgba(10, 14, 23, 0.95)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            borderBottom: '1px solid var(--border-color)',
+            padding: '12px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)'
+              }}>
+                <Crown size={20} color="#000" />
+              </div>
+              <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>
+                SURVEY KING 👑
+              </div>
+            </div>
+          </header>
+
           {/* Screen Content */}
           {activeTab === 'home' && (
             <HomeTab
@@ -336,7 +342,7 @@ export default function App() {
               <span>Profile</span>
             </button>
           </nav>
-        </>
+        </div>
       )}
     </div>
   );

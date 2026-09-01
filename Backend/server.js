@@ -90,21 +90,59 @@ app.post('/api/telegram/withdraw', telegramController.requestWithdrawal);
 app.post('/api/webhooks/surveys/:provider', webhookController.handleWebhook);
 app.get('/api/webhooks/surveys/:provider', webhookController.handleWebhook);
 
-// Admin APIs
-app.get('/api/admin/stats', adminController.getStats);
+// Admin APIs (All 12 Modules)
+// 1. Dashboard
+app.get('/api/admin/dashboard', adminController.getDashboardStats);
+app.get('/api/admin/stats', adminController.getDashboardStats);
+
+// 2. Users
 app.get('/api/admin/users', adminController.getUsers);
+app.get('/api/admin/users/:id/details', adminController.getUserDetails);
 app.post('/api/admin/users/:id/status', adminController.updateUserStatus);
 app.post('/api/admin/users/:id/balance', adminController.updateUserBalance);
+
+// 3. Surveys
+app.get('/api/admin/surveys/live', adminController.getLiveSurveys);
+app.get('/api/admin/surveys/custom', adminController.getCustomSurveys);
+app.post('/api/admin/surveys/custom', adminController.createCustomSurvey);
+app.put('/api/admin/surveys/custom/:id', adminController.updateCustomSurvey);
+app.delete('/api/admin/surveys/custom/:id', adminController.deleteCustomSurvey);
+app.get('/api/admin/surveys/attempts', adminController.getSurveyAttempts);
+app.get('/api/admin/surveys', adminController.getCustomSurveys);
+
+// 4. Postbacks & Safe Retry
+app.get('/api/admin/postbacks', adminController.getPostbacks);
+app.get('/api/admin/postbacks/:id', adminController.getPostbackDetails);
+app.post('/api/admin/postbacks/:id/retry', adminController.retryPostback);
+
+// 5. Wallet Ledger
+app.get('/api/admin/wallet/ledger', adminController.getWalletLedger);
+
+// 6. Withdrawals
 app.get('/api/admin/withdrawals', adminController.getWithdrawals);
 app.post('/api/admin/withdrawals/:id/action', adminController.processWithdrawal);
-app.get('/api/admin/surveys', telegramController.getSurveys);
-app.post('/api/admin/surveys', adminController.createSurvey);
-app.put('/api/admin/surveys/:id', adminController.updateSurvey);
-app.delete('/api/admin/surveys/:id', adminController.deleteSurvey);
+
+// 7. Referrals
+app.get('/api/admin/referrals/list', adminController.getReferralsList);
+app.get('/api/admin/referrals/stats', adminController.getReferralsList);
 app.get('/api/admin/referral-settings', adminController.getReferralSettings);
 app.put('/api/admin/referral-settings', adminController.updateReferralSettings);
-app.get('/api/admin/payout-methods', adminController.getPayoutMethods);
-app.post('/api/admin/payout-methods', adminController.createPayoutMethod);
+
+// 8. Telegram Bot
+app.get('/api/admin/telegram/status', adminController.getTelegramStatus);
+app.post('/api/admin/telegram/broadcast', adminController.broadcastTelegram);
+
+// 9. Fraud & Risk Center
+app.get('/api/admin/fraud', adminController.getFraudCenter);
+
+// 10. Analytics
+app.get('/api/admin/analytics', adminController.getAnalytics);
+
+// 11. Audit Logs
+app.get('/api/admin/audit-logs', adminController.getAuditLogs);
+
+// 12. Settings & Payout Methods
+app.get('/api/admin/settings', adminController.getSettings);
 app.put('/api/admin/payout-methods/:id', adminController.updatePayoutMethod);
 
 // SPA Wildcard Route Fallback for Frontend Single Page App

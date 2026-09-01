@@ -2,27 +2,37 @@ const db = require('../config/db');
 const { notifySurveyReward, notifyReferralReward } = require('../bot/telegramBot');
 
 async function handleWebhook(req, res) {
+  const startTime = Date.now();
+  const provider = (req.params.provider || 'cpx').toLowerCase();
+
+  // Map CPX Research parameters
+  const transId = req.query.trans_id || req.body.trans_id || req.query.participationId || req.body.participationId;
+  const rawStatus = String(req.query.status || req.body.status || '1');
+  const statusParam = (rawStatus === '1' || rawStatus.toUpperCase() === 'COMPLETED') ? 'COMPLETED' : 'CANCELED';
+  const tgUserId = req.query.user_id || req.body.user_id;
+  const offerId = req.query.offer_id || req.body.offer_id || 'CPX_OFFER';
+  const amountLocal = parseFloat(req.query.amount_local || req.body.amount_local || 0);
+  const amountUsd = parseFloat(req.query.amount_usd || req.body.amount_usd || 0);
+  const hash = req.query.hash || req.body.hash;
+
+  const clientIp = req.clientIp || req.headers['x-forwarded-for']?.split(',')[0].trim() || req.headers['cf-connecting-ip'] || req.socket.remoteAddress || '127.0.0.1';
+
+  console.log(`====================================================`);
+  console.log(`🎯 [CPX POSTBACK WEBHOOK] Timestamp: ${new Date().toISOString()}`);
+  console.log(`📡 Provider: ${provider.toUpperCase()} | Trans ID: ${transId || 'N/A'}`);
+  console.log(`👤 User ID: ${tgUserId || 'N/A'} | Status: ${statusParam} (${rawStatus}) | Reward: ${amountLocal} Coins`);
+  console.log(`🌐 IP: ${clientIp}`);
+  console.log(`====================================================`);
+
+  let idempotencyStatus = 'NEW';
+  let errorReason = null;
+  let walletCredited = 0;
+
   try {
-    const provider = (req.params.provider || 'cpx').toLowerCase();
-
-    // Map CPX Research parameters
-    const transId = req.query.trans_id || req.body.trans_id || req.query.participationId || req.body.participationId;
-    const rawStatus = String(req.query.status || req.body.status || '1');
-    const statusParam = (rawStatus === '1' || rawStatus.toUpperCase() === 'COMPLETED') ? 'COMPLETED' : 'CANCELED';
-    const tgUserId = req.query.user_id || req.body.user_id;
-    const amountLocal = parseFloat(req.query.amount_local || req.body.amount_local || 0);
-
-    const clientIp = req.clientIp || req.headers['x-forwarded-for']?.split(',')[0].trim() || req.headers['cf-connecting-ip'] || req.socket.remoteAddress || '127.0.0.1';
-
-    console.log(`====================================================`);
-    console.log(`🎯 [CPX POSTBACK WEBHOOK] Timestamp: ${new Date().toISOString()}`);
-    console.log(`📡 Provider: ${provider.toUpperCase()} | Trans ID: ${transId || 'N/A'}`);
-    console.log(`👤 User ID: ${tgUserId || 'N/A'} | Status: ${statusParam} (${rawStatus}) | Reward: ${amountLocal} Coins`);
-    console.log(`🌐 IP: ${clientIp}`);
-    console.log(`====================================================`);
-
     if (!transId && !tgUserId) {
-      return res.status(400).json({ error: 'trans_id or user_id is required in postback payload' });
+      errorReason = 'Missing trans_id and user_id';
+      await logPostback({ provider, transId, tgUserId, offerId, statusParam, rawStatus, amountLocal, amountUsd, clientIp, idempotencyStatus: 'INVALID', errorReason, walletCredited: 0, startTime });
+      return res.status(400).send('INVALID_PAYLOAD');
     }
 
     let participation = null;
@@ -43,7 +53,9 @@ async function handleWebhook(req, res) {
     if (participation) {
       // Idempotency check
       if (participation.status === 'COMPLETED') {
-        console.log(`⚠️ Participation ${transId} is ALREADY rewarded. Ignoring postback.`);
+        idempotencyStatus = 'DUPLICATE';
+        console.log(`⚠️ Participation ${transId} is ALREADY rewarded. Duplicate postback ignored.`);
+        await logPostback({ provider, transId, tgUserId: participation.user_id, offerId, statusParam, rawStatus, amountLocal, amountUsd, clientIp, idempotencyStatus: 'DUPLICATE', errorReason: 'Already rewarded (Duplicate)', walletCredited: 0, startTime });
         return res.send('OK'); // CPX expects HTTP 200 / "OK"
       }
 
@@ -52,6 +64,7 @@ async function handleWebhook(req, res) {
           `UPDATE survey_participations SET status = ? WHERE id = ?`,
           [statusParam, participation.id]
         );
+        await logPostback({ provider, transId, tgUserId: participation.user_id, offerId, statusParam, rawStatus, amountLocal, amountUsd, clientIp, idempotencyStatus: 'PROCESSED_CANCELED', errorReason: 'Survey Canceled / Screenout', walletCredited: 0, startTime });
         return res.send('OK');
       }
 
@@ -81,11 +94,14 @@ async function handleWebhook(req, res) {
     }
 
     if (!user) {
+      errorReason = 'User not found in database';
       console.warn(`⚠️ CPX Postback User not found for tgUserId: ${tgUserId}`);
+      await logPostback({ provider, transId, tgUserId, offerId, statusParam, rawStatus, amountLocal, amountUsd, clientIp, idempotencyStatus: 'USER_NOT_FOUND', errorReason, walletCredited: 0, startTime });
       return res.status(404).send('USER_NOT_FOUND');
     }
 
     if (statusParam !== 'COMPLETED') {
+      await logPostback({ provider, transId, tgUserId: user.telegram_user_id, offerId, statusParam, rawStatus, amountLocal, amountUsd, clientIp, idempotencyStatus: 'CANCELED', errorReason: null, walletCredited: 0, startTime });
       return res.send('OK');
     }
 
@@ -101,6 +117,7 @@ async function handleWebhook(req, res) {
       [user.id, rewardAmt, transId || 'CPX_POSTBACK', `CPX Research Survey Reward`]
     );
 
+    walletCredited = 1;
     console.log(`💰 Credited ${rewardAmt.toLocaleString()} Coins to User ${user.name} (ID: ${user.id}). New balance: ${newBalance.toLocaleString()} Coins`);
 
     // Send Live Telegram Notification for Survey Completion
@@ -168,10 +185,28 @@ async function handleWebhook(req, res) {
       }
     }
 
+    // Log Successful Postback
+    await logPostback({ provider, transId, tgUserId: user.telegram_user_id, offerId, statusParam, rawStatus, amountLocal: rewardAmt, amountUsd, clientIp, idempotencyStatus: 'SUCCESS', errorReason: null, walletCredited: 1, startTime });
+
     return res.send('OK'); // CPX Research requires "OK" response body
   } catch (err) {
     console.error('Error handling CPX postback webhook:', err);
+    await logPostback({ provider, transId, tgUserId, offerId, statusParam, rawStatus, amountLocal, amountUsd, clientIp, idempotencyStatus: 'ERROR', errorReason: err.message, walletCredited: 0, startTime });
     return res.status(500).send('ERROR');
+  }
+}
+
+// Helper to record postback audit in database
+async function logPostback({ provider, transId, tgUserId, offerId, statusParam, rawStatus, amountLocal, amountUsd, clientIp, idempotencyStatus, errorReason, walletCredited, startTime }) {
+  try {
+    const processingTime = Date.now() - startTime;
+    await db.execute(
+      `INSERT INTO postback_logs (provider, trans_id, user_id, offer_id, status, raw_status, amount_local, amount_usd, hash_valid, idempotency_status, ip, processing_time_ms, error_reason, wallet_credited)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
+      [provider || 'CPX', transId || null, tgUserId ? String(tgUserId) : null, offerId || 'CPX_OFFER', statusParam, rawStatus, amountLocal || 0, amountUsd || 0, idempotencyStatus, clientIp, processingTime, errorReason, walletCredited ? 1 : 0]
+    );
+  } catch (logErr) {
+    console.warn('⚠️ Could not log postback event to DB:', logErr.message);
   }
 }
 

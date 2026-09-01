@@ -17,20 +17,17 @@ async function initDB() {
   console.log(`====================================================`);
 
   const hostsToTry = [
+    '72.61.254.236',
     process.env.MYSQL_HOST,
     'databases-masterdb-ilm2d7',
-    '72.61.254.236',
-    'host.docker.internal',
-    '172.17.0.1',
     'localhost'
   ].filter(Boolean);
 
-  const portsToTry = [envPort, 3306, 3314];
+  const portsToTry = [3314, 3306, envPort];
   const usersToTry = [
+    { u: 'yellapusatyasai@gmail.com', p: '@SaiDivya2503' },
     { u: envUser, p: envPass },
-    { u: 'root', p: envPass },
-    { u: 'root', p: '@SaiDivya2503' },
-    { u: 'root', p: 'root' }
+    { u: 'root', p: '@SaiDivya2503' }
   ];
 
   const databaseCandidates = [
@@ -241,6 +238,92 @@ async function createTables() {
     ) ENGINE=InnoDB;
   `);
 
+  // Admin Users & RBAC
+  await mysqlPool.execute(`
+    CREATE TABLE IF NOT EXISTS admin_users (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      username VARCHAR(100) UNIQUE NOT NULL,
+      password_hash VARCHAR(255) NOT NULL,
+      role VARCHAR(50) DEFAULT 'SUPER_ADMIN',
+      name VARCHAR(150) DEFAULT 'Administrator',
+      status VARCHAR(30) DEFAULT 'ACTIVE',
+      last_login DATETIME DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB;
+  `);
+
+  // Admin Immutable Audit Logs
+  await mysqlPool.execute(`
+    CREATE TABLE IF NOT EXISTS admin_audit_logs (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      admin_username VARCHAR(100) NOT NULL,
+      action VARCHAR(100) NOT NULL,
+      target_type VARCHAR(100) NOT NULL,
+      target_id VARCHAR(100) DEFAULT NULL,
+      old_value TEXT DEFAULT NULL,
+      new_value TEXT DEFAULT NULL,
+      reason VARCHAR(255) DEFAULT '',
+      ip VARCHAR(100) DEFAULT '127.0.0.1',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB;
+  `);
+
+  // Postback Logs & Monitoring
+  await mysqlPool.execute(`
+    CREATE TABLE IF NOT EXISTS postback_logs (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      provider VARCHAR(50) NOT NULL DEFAULT 'CPX',
+      trans_id VARCHAR(100) DEFAULT NULL,
+      user_id VARCHAR(100) DEFAULT NULL,
+      offer_id VARCHAR(100) DEFAULT NULL,
+      status VARCHAR(50) NOT NULL DEFAULT 'COMPLETED',
+      raw_status VARCHAR(50) DEFAULT '1',
+      amount_local DECIMAL(10, 2) DEFAULT 0.00,
+      amount_usd DECIMAL(10, 4) DEFAULT 0.0000,
+      hash_valid TINYINT(1) DEFAULT 1,
+      idempotency_status VARCHAR(50) DEFAULT 'NEW',
+      ip VARCHAR(100) DEFAULT '',
+      processing_time_ms INT DEFAULT 0,
+      error_reason VARCHAR(255) DEFAULT NULL,
+      wallet_credited TINYINT(1) DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB;
+  `);
+
+  // Telegram Notifications Dispatch Ledger
+  await mysqlPool.execute(`
+    CREATE TABLE IF NOT EXISTS telegram_notifications (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      telegram_user_id VARCHAR(100) NOT NULL,
+      type VARCHAR(100) NOT NULL,
+      message TEXT NOT NULL,
+      status VARCHAR(50) DEFAULT 'SENT',
+      error_message VARCHAR(255) DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB;
+  `);
+
+  // Fraud & Security Risk Flags
+  await mysqlPool.execute(`
+    CREATE TABLE IF NOT EXISTS fraud_flags (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      risk_level VARCHAR(30) DEFAULT 'MEDIUM',
+      flag_type VARCHAR(100) NOT NULL,
+      description TEXT NOT NULL,
+      status VARCHAR(50) DEFAULT 'OPEN',
+      ip VARCHAR(100) DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB;
+  `);
+
+  // Surveys extra metadata columns
+  try { await mysqlPool.execute(`ALTER TABLE surveys ADD COLUMN priority INT DEFAULT 0;`); } catch (e) {}
+  try { await mysqlPool.execute(`ALTER TABLE surveys ADD COLUMN entry_url TEXT DEFAULT NULL;`); } catch (e) {}
+  try { await mysqlPool.execute(`ALTER TABLE surveys ADD COLUMN status VARCHAR(30) DEFAULT 'ACTIVE';`); } catch (e) {}
+  try { await mysqlPool.execute(`ALTER TABLE surveys ADD COLUMN start_date DATETIME DEFAULT NULL;`); } catch (e) {}
+  try { await mysqlPool.execute(`ALTER TABLE surveys ADD COLUMN end_date DATETIME DEFAULT NULL;`); } catch (e) {}
+
   await seedDefaults();
   console.log(`✅ All MySQL database tables in 'surveyking' verified and ready!`);
 }
@@ -283,6 +366,21 @@ async function seedDefaults() {
       );
     }
     console.log('✅ Default Payout Methods & Tiers initialized!');
+  }
+
+  // 3. Seed Super Admin User if empty
+  const adminRows = await query('SELECT COUNT(*) as cnt FROM admin_users');
+  const aCount = adminRows[0]?.cnt || adminRows[0]?.['COUNT(*)'] || 0;
+  if (aCount === 0) {
+    await execute(
+      `INSERT INTO admin_users (username, password_hash, role, name, status) 
+       VALUES ('admin', 'admin123', 'SUPER_ADMIN', 'Super Administrator', 'ACTIVE')`
+    );
+    await execute(
+      `INSERT INTO admin_audit_logs (admin_username, action, target_type, target_id, old_value, new_value, reason, ip)
+       VALUES ('SYSTEM', 'SYSTEM_INITIALIZATION', 'PLATFORM', '1', NULL, 'PLATFORM_ACTIVE', 'Survey King Platform Initialization', '127.0.0.1')`
+    );
+    console.log('✅ Default Super Admin account and Audit Ledger initialized!');
   }
 }
 
