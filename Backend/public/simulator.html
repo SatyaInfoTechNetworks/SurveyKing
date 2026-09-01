@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CPX Research Survey Simulator 👑</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --accent: #f59e0b;
+      --green: #10b981;
+      --text: #f8fafc;
+      --subtext: #94a3b8;
+    }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .card {
+      background-color: var(--card);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 28px;
+      max-width: 440px;
+      width: 100%;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+      text-align: center;
+    }
+    .badge {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      background: rgba(245, 158, 11, 0.2);
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 0.85rem;
+      margin-bottom: 16px;
+    }
+    h1 {
+      font-size: 1.5rem;
+      margin: 0 0 12px 0;
+    }
+    p {
+      color: var(--subtext);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    .reward-box {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 14px;
+      padding: 16px;
+      margin: 20px 0;
+    }
+    .reward-amt {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--green);
+    }
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: none;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: #000;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 15px -3px rgba(245, 158, 11, 0.4);
+    }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+    }
+    .progress-bar {
+      height: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 20px 0;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      width: 60%;
+      transition: width 0.3s;
+    }
+    .result-msg {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 10px;
+      display: none;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">CPX RESEARCH / PROVIDER SIMULATOR</div>
+    <h1 id="surveyTitle">Consumer Feedback Survey</h1>
+    <p>Please complete this quick 3-question survey to claim your reward.</p>
+
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress"></div>
+    </div>
+
+    <div class="reward-box">
+      <div style="font-size: 0.85rem; color: var(--subtext);">Reward on Completion</div>
+      <div class="reward-amt" id="rewardDisplay">₹40.00</div>
+    </div>
+
+    <div id="surveyQuestions">
+      <p style="text-align: left; font-weight: 600; color: #fff;">Q: How satisfied are you with digital rewards in 2026?</p>
+      <label style="display: block; text-align: left; margin: 8px 0; cursor: pointer;">
+        <input type="radio" name="q1" checked> Extremely Satisfied
+      </label>
+      <label style="display: block; text-align: left; margin: 8px 0; cursor: pointer;">
+        <input type="radio" name="q1"> Moderately Satisfied
+      </label>
+    </div>
+
+    <button class="btn btn-primary" id="completeBtn" onclick="completeSurvey()">✅ Complete & Claim Reward</button>
+    <button class="btn btn-secondary" onclick="window.close()">Cancel</button>
+
+    <div id="resultMsg" class="result-msg"></div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const participationId = urlParams.get('participationId');
+    const reward = urlParams.get('reward') || '4000';
+    const surveyId = urlParams.get('surveyId') || 'S101';
+
+    if (reward) {
+      document.getElementById('rewardDisplay').innerText = parseFloat(reward).toLocaleString() + ' 🪙';
+    }
+    if (surveyId) {
+      document.getElementById('surveyTitle').innerText = 'Survey ' + surveyId + ' - Consumer Research';
+    }
+
+    async function completeSurvey() {
+      const btn = document.getElementById('completeBtn');
+      const resultMsg = document.getElementById('resultMsg');
+      btn.disabled = true;
+      btn.innerText = '⏳ Submitting Provider Webhook...';
+      document.getElementById('progress').style.width = '100%';
+
+      try {
+        const response = await fetch('/api/webhooks/surveys/cpx', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            participationId,
+            status: 'COMPLETED'
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          resultMsg.style.display = 'block';
+          resultMsg.style.background = 'rgba(16, 185, 129, 0.2)';
+          resultMsg.style.color = '#10b981';
+          const earned = data.userRewarded ? data.userRewarded.rewardAmount : parseFloat(reward);
+          resultMsg.innerHTML = `🎉 <strong>Survey Completed!</strong><br>${earned.toLocaleString()} 🪙 (≈ ₹${(earned/100).toFixed(2)}) credited to your wallet balance!`;
+          
+          btn.innerText = '✅ Reward Credited!';
+          setTimeout(() => {
+            if (window.opener) {
+              window.close();
+            } else {
+              window.location.href = '/';
+            }
+          }, 2000);
+        } else {
+          resultMsg.style.display = 'block';
+          resultMsg.style.background = 'rgba(239, 68, 68, 0.2)';
+          resultMsg.style.color = '#ef4444';
+          resultMsg.innerText = 'Error: ' + (data.message || data.error || 'Failed to complete survey');
+          btn.innerText = 'Try Again';
+          btn.disabled = false;
+        }
+      } catch (err) {
+        resultMsg.style.display = 'block';
+        resultMsg.style.background = 'rgba(239, 68, 68, 0.2)';
+        resultMsg.style.color = '#ef4444';
+        resultMsg.innerText = 'Network error: ' + err.message;
+        btn.innerText = 'Try Again';
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
