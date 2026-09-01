@@ -280,9 +280,9 @@ async function getSurveys(req, res) {
       console.error('Error fetching CPX API:', cpxErr.message);
     }
 
-    // Fetch Live TimeWall Surveys if API key is configured
+    // Fetch Live TimeWall Surveys
     let liveTimeWallSurveys = [];
-    const timeWallApiKey = process.env.TIMEWALL_API_KEY || '';
+    const timeWallApiKey = process.env.TIMEWALL_API_KEY || 'tw_0b00b78ae1f3b367a700e4d16f8b7af5e7c48580d3a06e0ddeb44a1c516159ba';
     if (timeWallApiKey) {
       try {
         console.log(`⏱️ [FETCHING TIMEWALL SURVEYS API] User: ${tgUserId}`);

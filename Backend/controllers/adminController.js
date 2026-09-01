@@ -448,6 +448,47 @@ async function getLiveSurveys(req, res) {
       });
     }
 
+    // Also fetch Live TimeWall Surveys for Admin Monitor
+    const timeWallApiKey = process.env.TIMEWALL_API_KEY || 'tw_0b00b78ae1f3b367a700e4d16f8b7af5e7c48580d3a06e0ddeb44a1c516159ba';
+    if (timeWallApiKey) {
+      try {
+        const twRes = await fetch('https://api.timewall.io/get-surveys', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${timeWallApiKey}`
+          },
+          body: JSON.stringify({
+            uid: '1981634693',
+            ip: clientIp,
+            user_agent: userAgent,
+            screen_width: 390,
+            screen_height: 844,
+            limit: 10,
+            provider: 'all'
+          })
+        });
+        const twData = await twRes.json();
+        if (twData && twData.success && Array.isArray(twData.surveys)) {
+          const twSurveys = twData.surveys.map(s => ({
+            provider: 'TimeWall',
+            surveyId: String(s.id).substring(0, 10),
+            title: `TimeWall Survey #${String(s.id).substring(0, 8)}`,
+            reward: parseFloat(s.currency_amount || 0) > 0 ? parseFloat(s.currency_amount) : Math.round(parseFloat(s.usd_rate || 0.50) * 4500),
+            loi: parseInt(s.loi || 10, 10),
+            category: 'Market Research',
+            status: 'LIVE',
+            conversionRate: '35%',
+            score: '10.0',
+            payoutUsd: `$${parseFloat(s.usd_rate || 0.50).toFixed(2)}`
+          }));
+          liveSurveys = [...liveSurveys, ...twSurveys];
+        }
+      } catch (twErr) {
+        console.error('TimeWall Admin Fetch Error:', twErr.message);
+      }
+    }
+
     return res.json({ success: true, surveys: liveSurveys });
   } catch (err) {
     console.error('Error in getLiveSurveys:', err);
