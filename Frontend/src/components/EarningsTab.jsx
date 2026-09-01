@@ -196,26 +196,75 @@ export default function EarningsTab({ user, transactions, payoutMethods, onReque
           </div>
         ) : (
           transactions.map((tx) => {
-            const isPositive = tx.amount > 0;
-            const absoluteAmt = Math.abs(tx.amount);
+            const isPositive = parseFloat(tx.amount || 0) > 0;
+            const absoluteAmt = Math.abs(parseFloat(tx.amount || 0));
+            const formattedTime = tx.createdAt
+              ? new Date(tx.createdAt).toLocaleString([], {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: true
+                })
+              : 'Just now';
+
             return (
-              <div className="tx-item" key={tx.id || Math.random()}>
-                <div className="tx-info">
-                  <div className={`tx-icon ${isPositive ? 'income' : 'outcome'}`}>
+              <div
+                className="tx-item"
+                key={tx.id || Math.random()}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px',
+                  padding: '14px 0',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.06)'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                  <div
+                    className={`tx-icon ${isPositive ? 'income' : 'outcome'}`}
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      background: isPositive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                      color: isPositive ? '#10b981' : '#ef4444'
+                    }}
+                  >
                     {isPositive ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
                   </div>
-                  <div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#fff' }}>{tx.description || tx.type}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : 'Today'}
+
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#fff', lineHeight: 1.3 }}>
+                      {tx.description || tx.type}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '3px', fontWeight: 500 }}>
+                      {formattedTime}
                     </div>
                   </div>
                 </div>
 
-                <div className={`tx-amount ${isPositive ? 'positive' : 'negative'}`}>
-                  {isPositive ? '+' : '-'}{absoluteAmt.toLocaleString()} 🪙
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'right' }}>
-                    ≈ ₹{(absoluteAmt / 100).toFixed(2)}
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{
+                    fontSize: '0.95rem',
+                    fontWeight: 800,
+                    color: isPositive ? '#10b981' : '#ef4444',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    gap: '3px'
+                  }}>
+                    <span>{isPositive ? '+' : '-'}{absoluteAmt.toLocaleString()}</span>
+                    <Coins size={14} color={isPositive ? '#10b981' : '#ef4444'} />
+                  </div>
+                  <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', marginTop: '2px', fontWeight: 600 }}>
+                    ≈ ₹{(absoluteAmt / 100).toFixed(2)} INR
                   </div>
                 </div>
               </div>

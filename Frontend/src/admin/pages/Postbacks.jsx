@@ -158,47 +158,58 @@ export default function PostbacksPage({ postbacks, stats, onSelectPostback, filt
                 </td>
               </tr>
             ) : (
-              postbacks.map((pb) => (
-                <tr
-                  key={pb.id}
-                  onClick={() => onSelectPostback(pb.id)}
-                  style={{
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-                    cursor: 'pointer',
-                    transition: 'background 0.12s ease'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                >
-                  <td style={{ padding: '14px 18px', color: 'var(--text-muted, #64748b)', fontSize: '0.78rem' }}>
-                    {new Date(pb.created_at).toLocaleTimeString()}
-                  </td>
-                  <td style={{ padding: '14px 18px' }}>
-                    <span style={{ fontWeight: 800, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>
-                      {pb.provider}
-                    </span>
-                  </td>
-                  <td style={{ padding: '14px 18px', fontFamily: 'monospace', color: '#fff', fontWeight: 600 }}>
-                    {pb.trans_id || 'N/A'}
-                  </td>
-                  <td style={{ padding: '14px 18px', fontFamily: 'monospace', color: 'var(--text-secondary, #94a3b8)' }}>
-                    {pb.user_id || 'N/A'}
-                  </td>
-                  <td style={{ padding: '14px 18px', fontWeight: 800, color: '#10b981' }}>
-                    +{parseFloat(pb.amount_local || 0).toLocaleString()} 🪙
-                  </td>
-                  <td style={{ padding: '14px 18px' }}>
-                    <span style={{
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      padding: '3px 9px',
-                      borderRadius: '9999px',
-                      background: pb.idempotency_status === 'SUCCESS' ? 'rgba(16, 185, 129, 0.15)' : (pb.idempotency_status === 'DUPLICATE' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)'),
-                      color: pb.idempotency_status === 'SUCCESS' ? '#10b981' : (pb.idempotency_status === 'DUPLICATE' ? '#f59e0b' : '#ef4444')
-                    }}>
-                      {pb.idempotency_status}
-                    </span>
-                  </td>
+              postbacks.map((pb) => {
+                const isReversal = pb.idempotency_status === 'REVERSED' || pb.idempotency_status === 'DUPLICATE_REVERSAL' || pb.status === 'CANCELED' || pb.status === 'REVERSED';
+                const formattedTime = new Date(pb.created_at).toLocaleString([], {
+                  month: 'short',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: true
+                });
+
+                return (
+                  <tr
+                    key={pb.id}
+                    onClick={() => onSelectPostback(pb.id)}
+                    style={{
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+                      cursor: 'pointer',
+                      transition: 'background 0.12s ease'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <td style={{ padding: '14px 18px', color: 'var(--text-muted, #94a3b8)', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+                      {formattedTime}
+                    </td>
+                    <td style={{ padding: '14px 18px' }}>
+                      <span style={{ fontWeight: 800, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>
+                        {pb.provider}
+                      </span>
+                    </td>
+                    <td style={{ padding: '14px 18px', fontFamily: 'monospace', color: '#fff', fontWeight: 600 }}>
+                      {pb.trans_id || 'N/A'}
+                    </td>
+                    <td style={{ padding: '14px 18px', fontFamily: 'monospace', color: 'var(--text-secondary, #94a3b8)' }}>
+                      {pb.user_id || 'N/A'}
+                    </td>
+                    <td style={{ padding: '14px 18px', fontWeight: 800, color: isReversal ? '#ef4444' : '#10b981' }}>
+                      {isReversal ? '-' : '+'}{parseFloat(pb.amount_local || 0).toLocaleString()} 🪙
+                    </td>
+                    <td style={{ padding: '14px 18px' }}>
+                      <span style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        padding: '3px 9px',
+                        borderRadius: '9999px',
+                        background: pb.idempotency_status === 'SUCCESS' ? 'rgba(16, 185, 129, 0.15)' : (pb.idempotency_status === 'DUPLICATE' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)'),
+                        color: pb.idempotency_status === 'SUCCESS' ? '#10b981' : (pb.idempotency_status === 'DUPLICATE' ? '#f59e0b' : '#ef4444')
+                      }}>
+                        {pb.idempotency_status}
+                      </span>
+                    </td>
                   <td style={{ padding: '14px 18px', textAlign: 'right' }}>
                     <button
                       onClick={(e) => { e.stopPropagation(); onSelectPostback(pb.id); }}
@@ -220,8 +231,9 @@ export default function PostbacksPage({ postbacks, stats, onSelectPostback, filt
                     </button>
                   </td>
                 </tr>
-              ))
-            )}
+              );
+            })
+          )}
           </tbody>
         </table>
       </div>
