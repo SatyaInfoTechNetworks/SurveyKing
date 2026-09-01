@@ -10,14 +10,16 @@ import LandingPage from './components/LandingPage';
 export default function App() {
   const [viewMode, setViewMode] = useState(() => {
     const path = window.location.pathname.toLowerCase();
-    if (path === '/app' || path === '/miniapp' || path.startsWith('/app/') || path.startsWith('/miniapp/') || window.Telegram?.WebApp?.initData) {
+    if (path.includes('/admin') || path === '/app' || path === '/miniapp' || path.startsWith('/app/') || path.startsWith('/miniapp/') || window.Telegram?.WebApp?.initData) {
       return 'app';
     }
     return 'landing';
   });
 
   const [activeTab, setActiveTab] = useState('home');
-  const [showAdmin, setShowAdmin] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(() => {
+    return window.location.pathname.toLowerCase().includes('/admin');
+  });
   const [user, setUser] = useState(null);
   const [surveys, setSurveys] = useState([]);
   const [transactions, setTransactions] = useState([]);
