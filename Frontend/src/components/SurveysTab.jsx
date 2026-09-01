@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Target, Clock, Award, Play, ExternalLink, Coins } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-export default function SurveysTab({ surveys, onStartSurvey, activeParticipation, onCompleteWebhook }) {
+export default function SurveysTab({ surveys, cpxOfferwallUrl, onStartSurvey, activeParticipation, onCompleteWebhook }) {
   const [filterCategory, setFilterCategory] = useState('ALL');
   const [simulating, setSimulating] = useState(false);
 
@@ -42,6 +42,44 @@ export default function SurveysTab({ surveys, onStartSurvey, activeParticipation
           Complete quick surveys to earn instant Coins (1,000 Coins = ₹10.00).
         </p>
       </div>
+
+      {/* CPX Research Offerwall Main Banner Card */}
+      {cpxOfferwallUrl && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(29, 78, 216, 0.3) 100%)',
+          border: '1px solid rgba(59, 130, 246, 0.4)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '16px',
+          marginBottom: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+              <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.4)' }}>
+                OFFICIAL CPX RESEARCH OFFERWALL
+              </span>
+            </div>
+            <div style={{ fontWeight: 800, fontSize: '1rem', color: '#fff' }}>
+              CPX Research Survey Wall 🎯
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              Access hundreds of live high-payout surveys updated every 120s!
+            </div>
+          </div>
+
+          <a
+            href={cpxOfferwallUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-primary"
+            style={{ width: 'auto', padding: '10px 14px', fontSize: '0.8rem', background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', color: '#fff', textDecoration: 'none' }}
+          >
+            <ExternalLink size={14} /> Open Wall
+          </a>
+        </div>
+      )}
 
       {/* Category Pills */}
       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '16px' }}>

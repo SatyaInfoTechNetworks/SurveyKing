@@ -74,12 +74,17 @@ export default function App() {
     }
   };
 
+  const [cpxOfferwallUrl, setCpxOfferwallUrl] = useState('');
+
   const loadUserData = async (tgUserId) => {
     try {
-      // 1. Fetch Surveys
-      const sRes = await fetch('/api/telegram/surveys');
+      // 1. Fetch Surveys & CPX Offerwall link
+      const sRes = await fetch(`/api/telegram/surveys?telegramUserId=${tgUserId}`);
       const sData = await sRes.json();
-      if (sData.success) setSurveys(sData.surveys);
+      if (sData.success) {
+        setSurveys(sData.surveys);
+        if (sData.cpxOfferwallUrl) setCpxOfferwallUrl(sData.cpxOfferwallUrl);
+      }
 
       // 2. Fetch User Me
       const uRes = await fetch(`/api/telegram/me?telegramUserId=${tgUserId}`);
@@ -107,15 +112,19 @@ export default function App() {
       const res = await fetch(`/api/telegram/surveys/${survey.surveyId}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ telegramUserId: user.telegramUserId })
+        body: JSON.stringify({
+          telegramUserId: user.telegramUserId,
+          directHref: survey.href || undefined
+        })
       });
 
       const data = await res.json();
       if (data.success) {
         setActiveParticipation(data.participation);
         setActiveTab('surveys');
-        // Open provider simulator window if accessible
-        window.open(data.participation.providerUrl, '_blank');
+        if (data.participation.providerUrl) {
+          window.open(data.participation.providerUrl, '_blank');
+        }
       }
     } catch (err) {
       console.error('Failed to start survey:', err);
@@ -233,6 +242,7 @@ export default function App() {
           {activeTab === 'surveys' && (
             <SurveysTab
               surveys={surveys}
+              cpxOfferwallUrl={cpxOfferwallUrl}
               onStartSurvey={handleStartSurvey}
               activeParticipation={activeParticipation}
               onCompleteWebhook={handleCompleteWebhook}

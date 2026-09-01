@@ -155,11 +155,26 @@ async function getMe(req, res) {
   }
 }
 
+const crypto = require('crypto');
+
 // GET /api/telegram/surveys
 async function getSurveys(req, res) {
   try {
-    const surveys = await db.query('SELECT * FROM surveys WHERE active = 1 ORDER BY reward DESC');
-    const formatted = surveys.map(s => ({
+    const tgUserId = String(req.query.telegramUserId || '123456789');
+    const userIp = req.ip || req.headers['x-forwarded-for'] || '103.21.125.10';
+
+    const cpxAppId = process.env.CPX_APP_ID || '35805';
+    const cpxSecHash = process.env.CPX_SECURITY_HASH || 'rocaZHPRG8u3oHgTTJb5Yuwccm45kmlF';
+
+    // Calculate MD5 hash: md5(ext_user_id - cpxSecHash)
+    const hash = crypto.createHash('md5').update(`${tgUserId}-${cpxSecHash}`).digest('hex');
+
+    // CPX Offerwall Link
+    const cpxOfferwallUrl = `https://offers.cpx-research.com/index.php?app_id=${cpxAppId}&ext_user_id=${tgUserId}&secure_hash=${hash}`;
+
+    // Fetch Database Local / Admin Custom Surveys
+    const localSurveys = await db.query('SELECT * FROM surveys WHERE active = 1 ORDER BY reward DESC');
+    let formattedLocal = localSurveys.map(s => ({
       id: s.id,
       surveyId: s.survey_id,
       title: s.title,
@@ -167,10 +182,47 @@ async function getSurveys(req, res) {
       estimatedMinutes: s.estimated_minutes,
       provider: s.provider,
       category: s.category,
-      icon: s.icon
+      icon: s.icon,
+      isLiveCPX: false
     }));
 
-    return res.json({ success: true, surveys: formatted });
+    // Fetch Live CPX Research API Surveys
+    let liveCpxSurveys = [];
+    try {
+      const cpxApiUrl = `https://live-api.cpx-research.com/api/get-surveys.php?app_id=${cpxAppId}&ext_user_id=${tgUserId}&output_method=api&limit=12&secure_hash=${hash}&ip_user=${encodeURIComponent(userIp)}`;
+      const cpxRes = await fetch(cpxApiUrl);
+      const cpxData = await cpxRes.json();
+
+      if (cpxData && cpxData.status === 'success' && Array.isArray(cpxData.surveys)) {
+        liveCpxSurveys = cpxData.surveys.slice(0, 8).map((s, idx) => {
+          const usdPayout = parseFloat(s.payout_publisher_usd || s.payout || 0.50);
+          const coinReward = Math.max(1000, Math.round(usdPayout * 10000)); // $0.50 -> 5,000 Coins
+
+          return {
+            id: `cpx_${s.id}`,
+            surveyId: `CPX_${s.id}`,
+            title: s.title || `CPX Market Research #${s.id}`,
+            reward: coinReward,
+            estimatedMinutes: parseInt(s.loi || 8, 10),
+            provider: 'CPX Research Live',
+            category: s.category || 'Opinion',
+            icon: '🔥',
+            href: s.href_new || s.href,
+            isLiveCPX: true
+          };
+        });
+      }
+    } catch (cpxErr) {
+      console.warn('ℹ️ Could not fetch live CPX surveys, using local survey catalog:', cpxErr.message);
+    }
+
+    const allSurveys = [...liveCpxSurveys, ...formattedLocal];
+
+    return res.json({
+      success: true,
+      cpxOfferwallUrl,
+      surveys: allSurveys
+    });
   } catch (err) {
     console.error('Error in getSurveys:', err);
     return res.status(500).json({ error: 'Failed to fetch surveys' });
@@ -181,7 +233,7 @@ async function getSurveys(req, res) {
 async function startSurvey(req, res) {
   try {
     const surveyId = req.params.id;
-    const { telegramUserId } = req.body;
+    const { telegramUserId, directHref } = req.body;
 
     if (!telegramUserId) {
       return res.status(400).json({ error: 'telegramUserId is required' });
@@ -196,31 +248,45 @@ async function startSurvey(req, res) {
       return res.status(403).json({ error: 'Your account is banned. You cannot take surveys.' });
     }
 
+    let surveyTitle = 'CPX Research Survey';
+    let surveyReward = 5000;
+    let providerName = 'CPX Research';
+
     const surveys = await db.query('SELECT * FROM surveys WHERE survey_id = ? OR id = ?', [surveyId, surveyId]);
-    if (surveys.length === 0) {
-      return res.status(404).json({ error: 'Survey not found' });
+    if (surveys.length > 0) {
+      const s = surveys[0];
+      surveyTitle = s.title;
+      surveyReward = parseFloat(s.reward);
+      providerName = s.provider;
     }
-    const survey = surveys[0];
 
     const participationId = 'PART_' + Date.now() + '_' + Math.floor(1000 + Math.random() * 9000);
 
     await db.execute(
       `INSERT INTO survey_participations (participation_id, user_id, survey_id, provider, status, reward)
        VALUES (?, ?, ?, ?, 'STARTED', ?)`,
-      [participationId, user.id, survey.survey_id, survey.provider, survey.reward]
+      [participationId, user.id, surveyId, providerName, surveyReward]
     );
 
+    const cpxAppId = process.env.CPX_APP_ID || '35805';
+    const cpxSecHash = process.env.CPX_SECURITY_HASH || 'rocaZHPRG8u3oHgTTJb5Yuwccm45kmlF';
+    const hash = crypto.createHash('md5').update(`${user.telegram_user_id}-${cpxSecHash}`).digest('hex');
+
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
-    const providerUrl = `${backendUrl}/api/simulator?participationId=${participationId}&surveyId=${survey.survey_id}&reward=${survey.reward}`;
+    let providerUrl = directHref || `https://offers.cpx-research.com/index.php?app_id=${cpxAppId}&ext_user_id=${user.telegram_user_id}&secure_hash=${hash}&subid_1=${participationId}`;
+
+    if (!directHref && providerName !== 'CPX Research Live') {
+      providerUrl = `${backendUrl}/api/simulator?participationId=${participationId}&surveyId=${surveyId}&reward=${surveyReward}`;
+    }
 
     return res.json({
       success: true,
       participation: {
         participationId,
-        surveyId: survey.survey_id,
-        title: survey.title,
-        reward: parseFloat(survey.reward),
-        provider: survey.provider,
+        surveyId,
+        title: surveyTitle,
+        reward: surveyReward,
+        provider: providerName,
         status: 'STARTED',
         providerUrl
       }
