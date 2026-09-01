@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, Shield, Wallet, Target, Share2, ShieldAlert, CheckCircle, XCircle, Plus, Minus, ArrowRight, UserCheck, Ban } from 'lucide-react';
+import { X, Shield, Wallet, Target, Share2, ShieldAlert, CheckCircle, XCircle, Plus, Minus, ArrowRight, UserCheck, Ban, Trash2 } from 'lucide-react';
 
-export default function UserDrawer({ user, onClose, onRefresh, onAdjustBalance, onToggleStatus }) {
+export default function UserDrawer({ user, onClose, onRefresh, onAdjustBalance, onToggleStatus, onDeleteUser }) {
   const [activeSubTab, setActiveSubTab] = useState('overview');
   const [coinAdjustment, setCoinAdjustment] = useState('');
   const [adjustReason, setAdjustReason] = useState('');
@@ -314,6 +314,47 @@ export default function UserDrawer({ user, onClose, onRefresh, onAdjustBalance, 
                 >
                   {user.status === 'ACTIVE' ? <Ban size={16} /> : <UserCheck size={16} />}
                   <span>{user.status === 'ACTIVE' ? 'Ban User from Survey King' : 'Unban & Reactivate User'}</span>
+                </button>
+              </div>
+
+              {/* Action 3: Permanent User Deletion */}
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.06)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                borderRadius: '12px',
+                padding: '16px'
+              }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#ef4444', marginBottom: '6px' }}>
+                  🗑️ Danger Zone: Permanent Account Deletion
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted, #94a3b8)', marginBottom: '12px' }}>
+                  Permanently purges this user, their wallet ledger, withdrawals, and survey participation history. This action cannot be undone.
+                </div>
+                <button
+                  onClick={() => {
+                    if (window.confirm(`⚠️ DANGER: Are you sure you want to PERMANENTLY DELETE user "${user.name}" (TG ID: ${user.telegramUserId})?\n\nAll balances, survey records, referrals, and transactions will be purged.`)) {
+                      onDeleteUser(user.id);
+                    }
+                  }}
+                  disabled={loading}
+                  style={{
+                    width: '100%',
+                    background: 'rgba(239, 68, 68, 0.2)',
+                    border: '1px solid #ef4444',
+                    color: '#ef4444',
+                    padding: '10px',
+                    borderRadius: '8px',
+                    fontWeight: 800,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <Trash2 size={16} />
+                  <span>Permanently Delete User Account</span>
                 </button>
               </div>
             </div>

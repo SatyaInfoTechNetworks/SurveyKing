@@ -214,6 +214,22 @@ export default function AdminLayout({ onExitAdmin }) {
     }
   };
 
+  const handleDeleteUser = async (userId) => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        showNotification(data.message);
+        setSelectedUser(null);
+        loadAllData();
+      } else {
+        alert(data.error || 'Failed to delete user');
+      }
+    } catch (e) {
+      alert('Error deleting user');
+    }
+  };
+
   // Survey Actions
   const handleSaveSurvey = async (surveyPayload) => {
     setSurveyModalLoading(true);
@@ -354,7 +370,7 @@ export default function AdminLayout({ onExitAdmin }) {
     }
   };
 
-  // Payout Method Toggle
+  // Payout Method CRUD
   const handleSavePayoutMethod = async (methodId, active, tiers) => {
     try {
       const res = await fetch(`/api/admin/payout-methods/${methodId}`, {
@@ -369,6 +385,40 @@ export default function AdminLayout({ onExitAdmin }) {
       }
     } catch (e) {
       alert('Error updating payout method');
+    }
+  };
+
+  const handleCreatePayoutMethod = async (payload) => {
+    try {
+      const res = await fetch('/api/admin/payout-methods', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        showNotification(data.message);
+        loadAllData();
+      } else {
+        alert(data.error || 'Failed to create payout method');
+      }
+    } catch (e) {
+      alert('Error creating payout method');
+    }
+  };
+
+  const handleDeletePayoutMethod = async (methodId) => {
+    try {
+      const res = await fetch(`/api/admin/payout-methods/${methodId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        showNotification(data.message);
+        loadAllData();
+      } else {
+        alert(data.error || 'Failed to delete payout method');
+      }
+    } catch (e) {
+      alert('Error deleting payout method');
     }
   };
 
@@ -428,6 +478,7 @@ export default function AdminLayout({ onExitAdmin }) {
               users={users}
               onSelectUser={handleSelectUser}
               onRefresh={loadAllData}
+              onDeleteUser={handleDeleteUser}
               search={userSearch}
               setSearch={setUserSearch}
               filter={userFilter}
@@ -513,6 +564,10 @@ export default function AdminLayout({ onExitAdmin }) {
             <SettingsPage
               settings={settings}
               onSavePayoutMethod={handleSavePayoutMethod}
+              onCreatePayoutMethod={handleCreatePayoutMethod}
+              onDeletePayoutMethod={handleDeletePayoutMethod}
+              onSaveReferralSettings={handleSaveReferralSettings}
+              savingReferral={savingReferralSettings}
             />
           )}
 
@@ -530,6 +585,7 @@ export default function AdminLayout({ onExitAdmin }) {
           onRefresh={loadAllData}
           onAdjustBalance={handleAdjustBalance}
           onToggleStatus={handleToggleUserStatus}
+          onDeleteUser={handleDeleteUser}
         />
       )}
 

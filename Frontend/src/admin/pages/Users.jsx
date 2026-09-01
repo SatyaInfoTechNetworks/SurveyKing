@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Search, Users, UserCheck, Ban, ShieldAlert, ArrowRight, Eye, Plus, Minus } from 'lucide-react';
+import { Search, Users, UserCheck, Ban, ShieldAlert, ArrowRight, Eye, Plus, Minus, Trash2 } from 'lucide-react';
 
-export default function UsersPage({ users, onSelectUser, onRefresh, search, setSearch, filter, setFilter }) {
+export default function UsersPage({ users, onSelectUser, onRefresh, onDeleteUser, search, setSearch, filter, setFilter }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Page Header */}
@@ -186,24 +186,47 @@ export default function UsersPage({ users, onSelectUser, onRefresh, search, setS
 
                   {/* Action */}
                   <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onSelectUser(u.id); }}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.06)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        color: '#fff',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <Eye size={13} /> View
-                    </button>
+                    <div style={{ display: 'inline-flex', gap: '6px' }}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onSelectUser(u.id); }}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.06)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          color: '#fff',
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <Eye size={13} /> View
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Are you sure you want to permanently delete user "${u.name}" (#${u.telegramUserId})?`)) {
+                            onDeleteUser(u.id);
+                          }
+                        }}
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.12)',
+                          border: '1px solid rgba(239, 68, 68, 0.25)',
+                          color: '#ef4444',
+                          padding: '6px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))

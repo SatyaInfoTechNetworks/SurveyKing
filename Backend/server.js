@@ -100,6 +100,7 @@ app.get('/api/admin/users', adminController.getUsers);
 app.get('/api/admin/users/:id/details', adminController.getUserDetails);
 app.post('/api/admin/users/:id/status', adminController.updateUserStatus);
 app.post('/api/admin/users/:id/balance', adminController.updateUserBalance);
+app.delete('/api/admin/users/:id', adminController.deleteUser);
 
 // 3. Surveys
 app.get('/api/admin/surveys/live', adminController.getLiveSurveys);
@@ -143,7 +144,9 @@ app.get('/api/admin/audit-logs', adminController.getAuditLogs);
 
 // 12. Settings & Payout Methods
 app.get('/api/admin/settings', adminController.getSettings);
+app.post('/api/admin/payout-methods', adminController.createPayoutMethod);
 app.put('/api/admin/payout-methods/:id', adminController.updatePayoutMethod);
+app.delete('/api/admin/payout-methods/:id', adminController.deletePayoutMethod);
 
 // SPA Wildcard Route Fallback for Frontend Single Page App
 app.get('*', (req, res, next) => {
