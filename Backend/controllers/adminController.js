@@ -413,17 +413,45 @@ async function deleteUser(req, res) {
 // -------------------------------------------------------------------
 // 3. SURVEYS & CUSTOM SURVEY CREATOR
 // -------------------------------------------------------------------
+const crypto = require('crypto');
+
 async function getLiveSurveys(req, res) {
   try {
-    const defaultLiveSurveys = [
-      { provider: 'CPX Research', surveyId: 'CPX_TECH_8200', title: 'Technology & Smartphone Usage Habits', reward: 8200, loi: 8, category: 'Technology', status: 'LIVE', conversionRate: '42%' },
-      { provider: 'CPX Research', surveyId: 'CPX_SHOP_4200', title: 'Online Shopping & Delivery Preferences', reward: 4200, loi: 5, category: 'Shopping', status: 'LIVE', conversionRate: '38%' },
-      { provider: 'CPX Research', surveyId: 'CPX_FIN_10500', title: 'UPI & Digital Payments Research Survey', reward: 10500, loi: 12, category: 'Finance', status: 'LIVE', conversionRate: '29%' },
-      { provider: 'CPX Research', surveyId: 'CPX_LIFE_6100', title: 'Daily Beverage & Snacking Preferences', reward: 6100, loi: 6, category: 'Lifestyle', status: 'LIVE', conversionRate: '54%' }
-    ];
-    return res.json({ success: true, surveys: defaultLiveSurveys });
+    const cpxAppId = process.env.CPX_APP_ID || '35805';
+    const cpxSecHash = process.env.CPX_SECURITY_HASH || 'rocaZHPRG8u3oHgTTJb5Yuwccm45kmlF';
+    const clientIp = req.clientIp || req.headers['x-forwarded-for']?.split(',')[0].trim() || '106.77.190.23';
+    const userAgent = req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
+
+    const poolUser = '4779683';
+    const hash = crypto.createHash('md5').update(`${poolUser}-${cpxSecHash}`).digest('hex');
+    const cpxApiUrl = `https://live-api.cpx-research.com/api/get-surveys.php?app_id=${cpxAppId}&email=&ext_user_id=${poolUser}&subid_1=&subid_2=&output_method=api&ip_user=${encodeURIComponent(clientIp)}&user_agent=${encodeURIComponent(userAgent)}&limit=20&secure_hash=${hash}`;
+
+    const cpxRes = await fetch(cpxApiUrl);
+    const cpxData = await cpxRes.json();
+
+    let liveSurveys = [];
+    if (cpxData && Array.isArray(cpxData.surveys)) {
+      liveSurveys = cpxData.surveys.map(s => {
+        const payoutCoins = parseFloat(s.payout || 0) > 0 ? parseFloat(s.payout) : Math.round(parseFloat(s.payout_publisher_usd || 0.50) * 10000);
+        return {
+          provider: 'CPX Research',
+          surveyId: String(s.id),
+          title: s.title || `CPX Market Research #${s.id}`,
+          reward: Math.max(100, Math.round(payoutCoins)),
+          loi: parseInt(s.loi || 8, 10),
+          category: s.category || 'General',
+          status: 'LIVE',
+          conversionRate: `${s.conversion_rate || '20'}%`,
+          score: s.score || '10.0',
+          payoutUsd: `$${parseFloat(s.payout_publisher_usd || 0.50).toFixed(2)}`
+        };
+      });
+    }
+
+    return res.json({ success: true, surveys: liveSurveys });
   } catch (err) {
-    return res.status(500).json({ error: 'Failed to fetch live surveys' });
+    console.error('Error in getLiveSurveys:', err);
+    return res.json({ success: true, surveys: [] });
   }
 }
 
