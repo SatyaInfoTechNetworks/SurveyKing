@@ -17,7 +17,7 @@ COPY . .
 # Build Frontend production assets
 RUN npm --prefix Frontend run build
 
-# Expose port 5000 / process.env.PORT
+# Expose port 5000
 EXPOSE 5000
 
 ENV PORT=5000
