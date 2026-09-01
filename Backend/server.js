@@ -23,14 +23,30 @@ process.on('unhandledRejection', (reason) => {
   console.error(`💥 [${new Date().toISOString()}] UNHANDLED REJECTION:`, reason);
 });
 
+// Extract Real Client IP from Proxy Headers (Cloudflare / Traefik / NGINX)
+function getClientIp(req) {
+  const cfIp = req.headers['cf-connecting-ip'];
+  if (cfIp) return cfIp;
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    const ip = forwarded.split(',')[0].trim();
+    if (ip) return ip;
+  }
+  const realIp = req.headers['x-real-ip'];
+  if (realIp) return realIp;
+  return req.socket?.remoteAddress || req.ip || '127.0.0.1';
+}
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Log Every Incoming HTTP Request to Console
+// Log Every Incoming HTTP Request with Real Client IP to Console
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] 📥 ${req.method} ${req.originalUrl || req.url} - IP: ${req.ip || req.headers['x-forwarded-for'] || 'client'}`);
+  const clientIp = getClientIp(req);
+  req.clientIp = clientIp;
+  console.log(`[${new Date().toISOString()}] 📥 ${req.method} ${req.originalUrl || req.url} - Client IP: ${clientIp}`);
   next();
 });
 

@@ -6,7 +6,13 @@ async function handleWebhook(req, res) {
     const participationId = req.body.participationId || req.query.participationId;
     const statusParam = (req.body.status || req.query.status || 'COMPLETED').toUpperCase();
 
-    console.log(`📡 Webhook received from provider [${provider}] for participationId: ${participationId}, status: ${statusParam}`);
+    const clientIp = req.clientIp || req.headers['x-forwarded-for']?.split(',')[0].trim() || req.headers['cf-connecting-ip'] || req.socket.remoteAddress || '127.0.0.1';
+
+    console.log(`====================================================`);
+    console.log(`🎯 [SURVEY WEBHOOK EVENT] Timestamp: ${new Date().toISOString()}`);
+    console.log(`📡 Provider: ${provider.toUpperCase()} | Participation ID: ${participationId || 'N/A'}`);
+    console.log(`📊 Status: ${statusParam} | IP: ${clientIp}`);
+    console.log(`====================================================`);
 
     if (!participationId) {
       return res.status(400).json({ error: 'participationId is required in webhook payload' });

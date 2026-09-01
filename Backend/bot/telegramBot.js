@@ -25,6 +25,12 @@ function initBot() {
       const username = msg.from.username || 'user';
       const refCode = match ? match[1] : null;
 
+      console.log(`====================================================`);
+      console.log(`🤖 [TELEGRAM BOT /START EVENT] Timestamp: ${new Date().toISOString()}`);
+      console.log(`👤 User: ${name} (@${username}) | TG ID: ${tgUserId} | Chat ID: ${chatId}`);
+      console.log(`🎁 Start Parameter / Referral Code: ${refCode || 'NONE (Direct Start)'}`);
+      console.log(`====================================================`);
+
       try {
         // Register or get user via Auth logic
         let users = await db.query('SELECT * FROM users WHERE telegramUserId = ?', [tgUserId]);

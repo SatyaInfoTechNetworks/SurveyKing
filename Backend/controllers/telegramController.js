@@ -19,6 +19,14 @@ async function handleAuth(req, res) {
     }
 
     const tgIdStr = String(telegramUserId);
+    const clientIp = req.clientIp || req.headers['x-forwarded-for']?.split(',')[0].trim() || req.headers['cf-connecting-ip'] || req.socket.remoteAddress || '127.0.0.1';
+
+    console.log(`====================================================`);
+    console.log(`🔑 [TG AUTH EVENT] Timestamp: ${new Date().toISOString()}`);
+    console.log(`👤 Telegram User ID: ${tgIdStr} | Name: ${name || 'N/A'} | Username: @${username || 'N/A'}`);
+    console.log(`🌐 Client IP: ${clientIp}`);
+    console.log(`🎁 Start Param / Referral Code Used: ${referralCode || 'NONE (Direct Sign-up)'}`);
+    console.log(`====================================================`);
 
     // Check if user exists
     const users = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [tgIdStr]);
