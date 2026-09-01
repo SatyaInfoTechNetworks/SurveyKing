@@ -249,52 +249,15 @@ export default function App() {
           }}>
             <Crown size={20} color="#000" />
           </div>
-          <div>
-            <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>SURVEY KING 👑</div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>1,000 🪙 = ₹10 INR</div>
+          <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>
+            SURVEY KING 👑
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            onClick={() => setViewMode('landing')}
-            style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              color: '#fff',
-              padding: '6px 10px',
-              borderRadius: '9999px',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            <Globe size={13} />
-            <span>Landing</span>
-          </button>
-
-          <button
-            onClick={() => setShowAdmin(!showAdmin)}
-            style={{
-              background: showAdmin ? '#ef4444' : 'rgba(245, 158, 11, 0.15)',
-              border: `1px solid ${showAdmin ? '#ef4444' : 'rgba(245, 158, 11, 0.4)'}`,
-              color: showAdmin ? '#fff' : 'var(--accent-gold)',
-              padding: '6px 12px',
-              borderRadius: '9999px',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              cursor: 'pointer'
-            }}
-          >
-            <Shield size={14} />
-            <span>{showAdmin ? 'Close Admin' : 'Admin Panel'}</span>
-          </button>
+          <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', fontSize: '0.75rem', padding: '4px 10px' }}>
+            ⚡ 1,000 🪙 = ₹10
+          </span>
         </div>
       </header>
 
