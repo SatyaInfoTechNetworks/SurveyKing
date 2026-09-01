@@ -12,56 +12,78 @@ async function initDB() {
 
   console.log(`🔌 Initializing Survey King STRICT MySQL Database connection...`);
 
+  // Internal Docker & Host MySQL Candidate Combinations
+  const envHost = process.env.MYSQL_HOST;
+  const envPort = parseInt(process.env.MYSQL_PORT || '3314', 10);
+  const envUser = process.env.MYSQL_USER || 'yellapusatyasai@gmail.com';
+  const envPass = process.env.MYSQL_PASSWORD || '@SaiDivya2503';
+  const database = process.env.MYSQL_DATABASE || 'surveyking';
+
   const hostsToTry = [
-    process.env.MYSQL_HOST,
-    '72.61.254.236',
-    '172.17.0.1',
+    envHost,
     'host.docker.internal',
-    'localhost'
+    '172.17.0.1',
+    '172.18.0.1',
+    '172.19.0.1',
+    'dokploy-mysql',
+    'mysql',
+    'db',
+    'localhost',
+    '72.61.254.236'
   ].filter(Boolean);
+
+  const portsToTry = [envPort, 3306, 3314];
+  const usersToTry = [
+    { u: envUser, p: envPass },
+    { u: 'root', p: 'root' },
+    { u: 'root', p: '' }
+  ];
 
   let connected = false;
 
   for (const h of hostsToTry) {
-    try {
-      const dbPort = h === 'localhost' ? 3306 : port;
-      const dbUser = h === 'localhost' ? 'root' : user;
-      const dbPass = h === 'localhost' ? 'root' : password;
+    if (connected) break;
+    for (const prt of portsToTry) {
+      if (connected) break;
+      for (const cred of usersToTry) {
+        try {
+          // Attempt CREATE DATABASE IF NOT EXISTS 'surveyking'
+          try {
+            const rootConn = await mysql.createConnection({
+              host: h,
+              port: prt,
+              user: cred.u,
+              password: cred.p,
+              connectTimeout: 1500
+            });
+            await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${database}\`;`);
+            await rootConn.end();
+          } catch (createDbErr) {
+            // Ignore privilege error if DB already exists
+          }
 
-      // Ensure database 'surveyking' exists
-      try {
-        const rootConn = await mysql.createConnection({
-          host: h,
-          port: dbPort,
-          user: dbUser,
-          password: dbPass
-        });
-        await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${database}\`;`);
-        await rootConn.end();
-      } catch (createDbErr) {
-        // If user lacks CREATE DATABASE privilege, proceed directly to connecting
+          const testPool = mysql.createPool({
+            host: h,
+            port: prt,
+            user: cred.u,
+            password: cred.p,
+            database,
+            waitForConnections: true,
+            connectionLimit: 10,
+            connectTimeout: 2000
+          });
+
+          const conn = await testPool.getConnection();
+          console.log(`👑 Strictly Connected to Internal MySQL Database '${database}' at ${h}:${prt} (user: ${cred.u})!`);
+          conn.release();
+
+          mysqlPool = testPool;
+          connected = true;
+          break;
+        } catch (err) {
+          // Connection failed, try next candidate combination
+        }
       }
-
-      const testPool = mysql.createPool({
-        host: h,
-        port: dbPort,
-        user: dbUser,
-        password: dbPass,
-        database,
-        waitForConnections: true,
-        connectionLimit: 10,
-        connectTimeout: 5000
-      });
-
-      const conn = await testPool.getConnection();
-      console.log(`👑 Strictly Connected to MySQL Database '${database}' at ${h}:${dbPort}!`);
-      conn.release();
-
-      mysqlPool = testPool;
-      connected = true;
-      break;
-    } catch (err) {
-      console.warn(`ℹ️ Could not connect to MySQL at ${h}: ${err.message}`);
     }
   }
 
