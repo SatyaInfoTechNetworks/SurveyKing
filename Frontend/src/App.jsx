@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Target, Wallet, User, Crown, Shield, Sparkles } from 'lucide-react';
+import { Home, Target, Wallet, User, Crown, Shield, Globe, Smartphone } from 'lucide-react';
 import HomeTab from './components/HomeTab';
 import SurveysTab from './components/SurveysTab';
 import EarningsTab from './components/EarningsTab';
 import ProfileTab from './components/ProfileTab';
 import AdminPanel from './components/AdminPanel';
+import LandingPage from './components/LandingPage';
 
 export default function App() {
+  const [viewMode, setViewMode] = useState(() => {
+    // If inside Telegram WebApp, open Mini App directly; otherwise default to Landing Page
+    if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
+      return 'app';
+    }
+    return window.location.pathname === '/app' ? 'app' : 'landing';
+  });
+
   const [activeTab, setActiveTab] = useState('home');
   const [showAdmin, setShowAdmin] = useState(false);
   const [user, setUser] = useState(null);
@@ -207,6 +216,10 @@ export default function App() {
     );
   }
 
+  if (viewMode === 'landing') {
+    return <LandingPage onLaunchApp={() => setViewMode('app')} />;
+  }
+
   return (
     <div style={{ width: '100%', minHeight: '100vh', position: 'relative', background: '#0a0e17' }}>
       {/* Top Application Header Bar */}
@@ -242,25 +255,47 @@ export default function App() {
           </div>
         </div>
 
-        <button
-          onClick={() => setShowAdmin(!showAdmin)}
-          style={{
-            background: showAdmin ? '#ef4444' : 'rgba(245, 158, 11, 0.15)',
-            border: `1px solid ${showAdmin ? '#ef4444' : 'rgba(245, 158, 11, 0.4)'}`,
-            color: showAdmin ? '#fff' : 'var(--accent-gold)',
-            padding: '6px 12px',
-            borderRadius: '9999px',
-            fontSize: '0.75rem',
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            cursor: 'pointer'
-          }}
-        >
-          <Shield size={14} />
-          <span>{showAdmin ? 'Close Admin' : 'Admin Panel'}</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={() => setViewMode('landing')}
+            style={{
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              color: '#fff',
+              padding: '6px 10px',
+              borderRadius: '9999px',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            <Globe size={13} />
+            <span>Landing</span>
+          </button>
+
+          <button
+            onClick={() => setShowAdmin(!showAdmin)}
+            style={{
+              background: showAdmin ? '#ef4444' : 'rgba(245, 158, 11, 0.15)',
+              border: `1px solid ${showAdmin ? '#ef4444' : 'rgba(245, 158, 11, 0.4)'}`,
+              color: showAdmin ? '#fff' : 'var(--accent-gold)',
+              padding: '6px 12px',
+              borderRadius: '9999px',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            <Shield size={14} />
+            <span>{showAdmin ? 'Close Admin' : 'Admin Panel'}</span>
+          </button>
+        </div>
       </header>
 
       {showAdmin ? (
