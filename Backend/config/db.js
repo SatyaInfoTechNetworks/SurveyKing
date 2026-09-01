@@ -25,28 +25,46 @@ async function initDB() {
     'localhost'
   ].filter(Boolean);
 
-  let connected = false;
+  const targetDbName = process.env.MYSQL_DATABASE || 'surveyking';
 
   for (const h of hostsToTry) {
     try {
+      const dbPort = h === 'localhost' ? 3306 : port;
+      const dbUser = h === 'localhost' ? 'root' : user;
+      const dbPass = h === 'localhost' ? 'root' : password;
+
+      // Ensure database 'surveyking' exists
+      try {
+        const rootConn = await mysql.createConnection({
+          host: h,
+          port: dbPort,
+          user: dbUser,
+          password: dbPass
+        });
+        await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${targetDbName}\`;`);
+        await rootConn.end();
+      } catch (createDbErr) {
+        // If no CREATE DATABASE permission, connect directly to targetDbName
+      }
+
       const testPool = mysql.createPool({
         host: h,
-        port: h === 'localhost' ? 3306 : port,
-        user: h === 'localhost' ? 'root' : user,
-        password: h === 'localhost' ? 'root' : password,
-        database: h === 'localhost' ? 'surveyking' : 'primary_db',
+        port: dbPort,
+        user: dbUser,
+        password: dbPass,
+        database: targetDbName,
         waitForConnections: true,
         connectionLimit: 10,
         connectTimeout: 3000
       });
 
       const conn = await testPool.getConnection();
-      console.log(`👑 Connected to MySQL Database at ${h}:${h === 'localhost' ? 3306 : port}!`);
+      console.log(`👑 Connected to MySQL Database '${targetDbName}' at ${h}:${dbPort}!`);
       conn.release();
 
       mysqlPool = testPool;
       dbMode = 'MYSQL';
-      activeDbName = h === 'localhost' ? 'surveyking' : 'primary_db';
+      activeDbName = targetDbName;
       connected = true;
       break;
     } catch (err) {
