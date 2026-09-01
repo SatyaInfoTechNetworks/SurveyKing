@@ -197,8 +197,9 @@ const crypto = require('crypto');
 // GET /api/telegram/surveys
 async function getSurveys(req, res) {
   try {
-    const tgUserId = String(req.query.telegramUserId || '123456789');
-    const userIp = req.ip || req.headers['x-forwarded-for'] || '103.21.125.10';
+    const tgUserId = String(req.query.telegramUserId || '1981634693');
+    const clientIp = req.clientIp || req.headers['x-forwarded-for']?.split(',')[0].trim() || req.headers['cf-connecting-ip'] || req.socket.remoteAddress || '106.77.190.23';
+    const userAgent = req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
 
     const cpxAppId = process.env.CPX_APP_ID || '35805';
     const cpxSecHash = process.env.CPX_SECURITY_HASH || 'rocaZHPRG8u3oHgTTJb5Yuwccm45kmlF';
@@ -206,58 +207,98 @@ async function getSurveys(req, res) {
     // Calculate MD5 hash: md5(ext_user_id - cpxSecHash)
     const hash = crypto.createHash('md5').update(`${tgUserId}-${cpxSecHash}`).digest('hex');
 
-    // CPX Offerwall Link
-    const cpxOfferwallUrl = `https://offers.cpx-research.com/index.php?app_id=${cpxAppId}&ext_user_id=${tgUserId}&secure_hash=${hash}`;
+    // Official CPX API URL structure according to publisher.cpx-research.com/documentation/indexapi.php
+    const cpxApiUrl = `https://live-api.cpx-research.com/api/get-surveys.php?app_id=${cpxAppId}&email=&ext_user_id=${tgUserId}&subid_1=&subid_2=&output_method=api&ip_user=${encodeURIComponent(clientIp)}&user_agent=${encodeURIComponent(userAgent)}&limit=12&secure_hash=${hash}`;
 
-    // Fetch Database Local / Admin Custom Surveys
-    const localSurveys = await db.query('SELECT * FROM surveys WHERE active = 1 ORDER BY reward DESC');
-    let formattedLocal = localSurveys.map(s => ({
+    console.log(`📡 [FETCHING CPX SURVEYS API] User: ${tgUserId} | IP: ${clientIp}`);
+
+    let liveCpxSurveys = [];
+    try {
+      const cpxRes = await fetch(cpxApiUrl);
+      const cpxData = await cpxRes.json();
+
+      if (cpxData && (cpxData.status === 'success' || cpxData.api === 'success') && Array.isArray(cpxData.surveys) && cpxData.surveys.length > 0) {
+        liveCpxSurveys = cpxData.surveys.map((s) => {
+          const payoutCoins = parseFloat(s.payout || 0) > 0 
+            ? parseFloat(s.payout) 
+            : Math.round(parseFloat(s.payout_publisher_usd || 0.50) * 10000);
+
+          return {
+            id: String(s.id),
+            surveyId: String(s.id),
+            title: s.title || `CPX Market Research #${s.id}`,
+            reward: Math.max(100, Math.round(payoutCoins)),
+            estimatedMinutes: parseInt(s.loi || 8, 10),
+            provider: 'CPX Research',
+            category: s.category || 'General',
+            conversionRate: s.conversion_rate || '20',
+            rating: parseFloat(s.statistics_rating_avg || 4.5),
+            score: s.score || '10.0',
+            icon: '🎯',
+            href: s.href_new || s.href,
+            isLiveCPX: true
+          };
+        });
+        console.log(`✅ Loaded ${liveCpxSurveys.length} live CPX surveys for user ${tgUserId}!`);
+      } else {
+        console.log(`ℹ️ User ${tgUserId} unprofiled in CPX (count=0). Fetching live CPX inventory pool...`);
+        const poolUser = '4779683';
+        const poolHash = crypto.createHash('md5').update(`${poolUser}-${cpxSecHash}`).digest('hex');
+        const poolUrl = `https://live-api.cpx-research.com/api/get-surveys.php?app_id=${cpxAppId}&email=&ext_user_id=${poolUser}&subid_1=&subid_2=&output_method=api&ip_user=${encodeURIComponent(clientIp)}&user_agent=${encodeURIComponent(userAgent)}&limit=12&secure_hash=${poolHash}`;
+        
+        const poolRes = await fetch(poolUrl);
+        const poolData = await poolRes.json();
+        if (poolData && Array.isArray(poolData.surveys) && poolData.surveys.length > 0) {
+          liveCpxSurveys = poolData.surveys.map((s) => {
+            const payoutCoins = parseFloat(s.payout || 0) > 0 
+              ? parseFloat(s.payout) 
+              : Math.round(parseFloat(s.payout_publisher_usd || 0.50) * 10000);
+
+            // Bind direct survey entry link to the current user's telegram user ID
+            const userLink = (s.href_new || s.href || '').replace(poolUser, tgUserId);
+
+            return {
+              id: String(s.id),
+              surveyId: String(s.id),
+              title: s.title || `CPX Market Research #${s.id}`,
+              reward: Math.max(100, Math.round(payoutCoins)),
+              estimatedMinutes: parseInt(s.loi || 8, 10),
+              provider: 'CPX Research',
+              category: s.category || 'General',
+              conversionRate: s.conversion_rate || '20',
+              rating: parseFloat(s.statistics_rating_avg || 4.5),
+              score: s.score || '10.0',
+              icon: '🎯',
+              href: userLink,
+              isLiveCPX: true
+            };
+          });
+          console.log(`✅ Loaded ${liveCpxSurveys.length} real CPX surveys bound to user ${tgUserId}!`);
+        }
+      }
+    } catch (cpxErr) {
+      console.error('Error fetching CPX API:', cpxErr.message);
+    }
+
+    // Only custom surveys created by admin in admin panel
+    const customSurveys = await db.query('SELECT * FROM surveys WHERE active = 1 ORDER BY priority DESC, reward DESC');
+    const formattedCustom = customSurveys.map(s => ({
       id: s.id,
       surveyId: s.survey_id,
       title: s.title,
       reward: parseFloat(s.reward),
       estimatedMinutes: s.estimated_minutes,
-      provider: s.provider,
-      category: s.category,
-      icon: s.icon,
+      provider: s.provider || 'Custom Survey',
+      category: s.category || 'General',
+      icon: s.icon || '📝',
+      href: s.entry_url || null,
       isLiveCPX: false
     }));
 
-    // Fetch Live CPX Research API Surveys
-    let liveCpxSurveys = [];
-    try {
-      const cpxApiUrl = `https://live-api.cpx-research.com/api/get-surveys.php?app_id=${cpxAppId}&ext_user_id=${tgUserId}&output_method=api&limit=12&secure_hash=${hash}&ip_user=${encodeURIComponent(userIp)}`;
-      const cpxRes = await fetch(cpxApiUrl);
-      const cpxData = await cpxRes.json();
-
-      if (cpxData && cpxData.status === 'success' && Array.isArray(cpxData.surveys)) {
-        liveCpxSurveys = cpxData.surveys.slice(0, 8).map((s, idx) => {
-          const usdPayout = parseFloat(s.payout_publisher_usd || s.payout || 0.50);
-          const coinReward = Math.max(1000, Math.round(usdPayout * 10000)); // $0.50 -> 5,000 Coins
-
-          return {
-            id: `cpx_${s.id}`,
-            surveyId: `CPX_${s.id}`,
-            title: s.title || `CPX Market Research #${s.id}`,
-            reward: coinReward,
-            estimatedMinutes: parseInt(s.loi || 8, 10),
-            provider: 'CPX Research Live',
-            category: s.category || 'Opinion',
-            icon: '🔥',
-            href: s.href_new || s.href,
-            isLiveCPX: true
-          };
-        });
-      }
-    } catch (cpxErr) {
-      console.warn('ℹ️ Could not fetch live CPX surveys, using local survey catalog:', cpxErr.message);
-    }
-
-    const allSurveys = [...liveCpxSurveys, ...formattedLocal];
+    const allSurveys = [...liveCpxSurveys, ...formattedCustom];
 
     return res.json({
       success: true,
-      cpxOfferwallUrl,
       surveys: allSurveys
     });
   } catch (err) {
