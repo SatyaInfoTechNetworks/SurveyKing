@@ -42,11 +42,20 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Log Every Incoming HTTP Request with Real Client IP to Console
+// Log Every Incoming HTTP Request with Full Details to Dokploy Console
 app.use((req, res, next) => {
   const clientIp = getClientIp(req);
   req.clientIp = clientIp;
-  console.log(`[${new Date().toISOString()}] 📥 ${req.method} ${req.originalUrl || req.url} - Client IP: ${clientIp}`);
+  console.log(`----------------------------------------------------`);
+  console.log(`📥 [INCOMING HTTP ${req.method}] ${req.originalUrl || req.url}`);
+  console.log(`🌐 Client IP: ${clientIp} | User-Agent: ${req.headers['user-agent'] || 'N/A'}`);
+  if (Object.keys(req.query || {}).length > 0) {
+    console.log(`🔍 Query Params:`, JSON.stringify(req.query));
+  }
+  if (Object.keys(req.body || {}).length > 0) {
+    console.log(`📦 Body Payload:`, JSON.stringify(req.body));
+  }
+  console.log(`----------------------------------------------------`);
   next();
 });
 
