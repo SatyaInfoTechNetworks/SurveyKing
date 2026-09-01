@@ -127,24 +127,21 @@ export default function App() {
 
   // Start Survey Handler
   const handleStartSurvey = async (survey) => {
-    if (!user) return;
     try {
-      const res = await fetch(`/api/telegram/surveys/${survey.surveyId}/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          telegramUserId: user.telegramUserId,
-          directHref: survey.href || undefined
-        })
-      });
+      const surveyUrl = survey.href || survey.providerUrl || (survey.id ? `https://live-api.cpx-research.com/index.php?app_id=35805&ext_user_id=${user?.telegramUserId || '1981634693'}&survey_id=${survey.id}` : null);
+      if (surveyUrl) {
+        window.open(surveyUrl, '_blank');
+      }
 
-      const data = await res.json();
-      if (data.success) {
-        setActiveParticipation(data.participation);
-        setActiveTab('surveys');
-        if (data.participation.providerUrl) {
-          window.open(data.participation.providerUrl, '_blank');
-        }
+      if (user && survey.id) {
+        fetch(`/api/telegram/surveys/${survey.id}/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegramUserId: user.telegramUserId,
+            directHref: survey.href || undefined
+          })
+        }).catch(() => {});
       }
     } catch (err) {
       console.error('Failed to start survey:', err);
@@ -283,10 +280,7 @@ export default function App() {
           {activeTab === 'surveys' && (
             <SurveysTab
               surveys={surveys}
-              cpxOfferwallUrl={cpxOfferwallUrl}
               onStartSurvey={handleStartSurvey}
-              activeParticipation={activeParticipation}
-              onCompleteWebhook={handleCompleteWebhook}
             />
           )}
 
