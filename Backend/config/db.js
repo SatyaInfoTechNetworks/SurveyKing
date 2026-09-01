@@ -4,8 +4,8 @@ require('dotenv').config();
 let mysqlPool = null;
 
 async function initDB() {
-  const envHost = process.env.MYSQL_HOST;
-  const envPort = parseInt(process.env.MYSQL_PORT || '3314', 10);
+  const envHost = process.env.MYSQL_HOST || 'databases-masterdb-ilm2d7';
+  const envPort = parseInt(process.env.MYSQL_PORT || '3306', 10);
   const envUser = process.env.MYSQL_USER || 'yellapusatyasai@gmail.com';
   const envPass = process.env.MYSQL_PASSWORD || '@SaiDivya2503';
   const database = process.env.MYSQL_DATABASE || 'surveyking';
@@ -17,23 +17,18 @@ async function initDB() {
   console.log(`====================================================`);
 
   const hostsToTry = [
-    envHost,
+    process.env.MYSQL_HOST,
+    'databases-masterdb-ilm2d7',
+    '72.61.254.236',
     'host.docker.internal',
     '172.17.0.1',
-    '172.18.0.1',
-    '172.19.0.1',
-    'dokploy-mysql',
-    'mysql',
-    'db',
-    'localhost',
-    '72.61.254.236'
+    'localhost'
   ].filter(Boolean);
 
   const portsToTry = [envPort, 3306, 3314];
   const usersToTry = [
     { u: envUser, p: envPass },
-    { u: 'root', p: 'root' },
-    { u: 'root', p: '' }
+    { u: 'root', p: 'root' }
   ];
 
   let connected = false;
@@ -52,13 +47,13 @@ async function initDB() {
               port: prt,
               user: cred.u,
               password: cred.p,
-              connectTimeout: 1500
+              connectTimeout: 2000
             });
             await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${database}\`;`);
             await rootConn.end();
             console.log(`📦 Ensured database '${database}' exists on ${h}:${prt}`);
           } catch (createDbErr) {
-            // Ignore privilege error if DB already exists
+            // Ignore privilege error if DB already exists or user lacks CREATE DB permission
           }
 
           const testPool = mysql.createPool({
@@ -69,12 +64,12 @@ async function initDB() {
             database,
             waitForConnections: true,
             connectionLimit: 10,
-            connectTimeout: 2000
+            connectTimeout: 3000
           });
 
           const conn = await testPool.getConnection();
           console.log(`====================================================`);
-          console.log(`👑 SUCCESS! Connected to MySQL Database '${database}'`);
+          console.log(`👑 SUCCESS! Connected to Dokploy MySQL Database '${database}'`);
           console.log(`📍 Host: ${h}:${prt} | User: ${cred.u}`);
           console.log(`====================================================`);
           conn.release();
