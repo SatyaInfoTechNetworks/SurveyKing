@@ -81,10 +81,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Simulator route
-app.get('/api/simulator', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'simulator.html'));
-});
 
 // Telegram APIs
 app.post('/api/telegram/auth', telegramController.handleAuth);
