@@ -358,30 +358,7 @@ async function seedDefaults() {
     console.log('✅ Default Payout Methods & Tiers initialized!');
   }
 
-  // 3. Seed Starter Surveys in surveys table if empty
-  const surveyRows = await query('SELECT COUNT(*) as cnt FROM surveys');
-  const surCount = surveyRows[0]?.cnt || surveyRows[0]?.['COUNT(*)'] || 0;
-  if (surCount === 0) {
-    const starterSurveys = [
-      { survey_id: 'SURV_TECH_01', title: '📱 Consumer Tech & Smartphone Survey', reward: 2500, estimated_minutes: 5, provider: 'Survey King Partner', category: 'Technology', icon: '📱' },
-      { survey_id: 'SURV_SHOP_02', title: '🛍️ Online Shopping & Quick Commerce Study', reward: 3500, estimated_minutes: 7, provider: 'Survey King Partner', category: 'Shopping', icon: '🛍️' },
-      { survey_id: 'SURV_OTT_03', title: '🎬 OTT & Entertainment Streaming Survey', reward: 4500, estimated_minutes: 8, provider: 'Survey King Partner', category: 'Lifestyle', icon: '🎬' },
-      { survey_id: 'SURV_FIN_04', title: '💳 UPI & Digital Banking Feedback', reward: 5000, estimated_minutes: 10, provider: 'Survey King Partner', category: 'Finance', icon: '💳' },
-      { survey_id: 'SURV_FOOD_05', title: '🍔 Food Delivery & Dining Habits Poll', reward: 2000, estimated_minutes: 4, provider: 'Survey King Partner', category: 'Lifestyle', icon: '🍔' },
-      { survey_id: 'SURV_AUTO_06', title: '🚗 Electric Vehicles & Mobility Preferences', reward: 3000, estimated_minutes: 6, provider: 'Survey King Partner', category: 'Technology', icon: '🚗' }
-    ];
-
-    for (const s of starterSurveys) {
-      await execute(
-        `INSERT INTO surveys (survey_id, title, reward, estimated_minutes, provider, category, icon, active, priority) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1)`,
-        [s.survey_id, s.title, s.reward, s.estimated_minutes, s.provider, s.category, s.icon]
-      );
-    }
-    console.log('✅ Default starter survey catalog initialized!');
-  }
-
-  // 4. Seed Super Admin User if empty
+  // 3. Seed Super Admin User if empty
   const adminRows = await query('SELECT COUNT(*) as cnt FROM admin_users');
   const aCount = adminRows[0]?.cnt || adminRows[0]?.['COUNT(*)'] || 0;
   if (aCount === 0) {
