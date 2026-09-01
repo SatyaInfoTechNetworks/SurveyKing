@@ -9,11 +9,11 @@ import LandingPage from './components/LandingPage';
 
 export default function App() {
   const [viewMode, setViewMode] = useState(() => {
-    // If inside Telegram WebApp, open Mini App directly; otherwise default to Landing Page
-    if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
+    const path = window.location.pathname.toLowerCase();
+    if (path === '/app' || path === '/miniapp' || path.startsWith('/app/') || path.startsWith('/miniapp/') || window.Telegram?.WebApp?.initData) {
       return 'app';
     }
-    return window.location.pathname === '/app' ? 'app' : 'landing';
+    return 'landing';
   });
 
   const [activeTab, setActiveTab] = useState('home');
