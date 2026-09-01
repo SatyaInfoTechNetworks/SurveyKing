@@ -65,9 +65,9 @@ export default function App() {
         telegramUserId: '123456789',
         name: 'Demo King User',
         username: 'demoking',
-        balance: 12550,
+        balance: 0,
         referralCode: 'SK99887',
-        stats: { surveysCompleted: 7, todayEarnings: 8000, weekEarnings: 12550 }
+        stats: { surveysCompleted: 0, todayEarnings: 0, weekEarnings: 0 }
       });
     } finally {
       setLoading(false);

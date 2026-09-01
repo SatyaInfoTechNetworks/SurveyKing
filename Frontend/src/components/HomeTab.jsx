@@ -3,7 +3,7 @@ import { Crown, Sparkles, TrendingUp, ShieldCheck, Play, ArrowRight, Zap, Coins 
 
 export default function HomeTab({ user, surveys, onStartSurvey, onNavigate }) {
   const topSurveys = surveys.slice(0, 3);
-  const coins = user?.balance ?? 12550;
+  const coins = user?.balance ?? 0;
   const rupees = (coins / 100).toFixed(2);
 
   return (
@@ -69,21 +69,21 @@ export default function HomeTab({ user, surveys, onStartSurvey, onNavigate }) {
         <div style={{ background: 'var(--bg-card)', padding: '12px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Today</div>
           <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--accent-green)', marginTop: '4px' }}>
-            +{user?.stats?.todayEarnings ? user.stats.todayEarnings.toLocaleString() : '8,000'} 🪙
+            +{user?.stats?.todayEarnings ? user.stats.todayEarnings.toLocaleString() : '0'} 🪙
           </div>
         </div>
 
         <div style={{ background: 'var(--bg-card)', padding: '12px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>This Week</div>
           <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--accent-gold)', marginTop: '4px' }}>
-            {user?.stats?.weekEarnings ? user.stats.weekEarnings.toLocaleString() : '12,550'} 🪙
+            {user?.stats?.weekEarnings ? user.stats.weekEarnings.toLocaleString() : '0'} 🪙
           </div>
         </div>
 
         <div style={{ background: 'var(--bg-card)', padding: '12px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Completed</div>
           <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', marginTop: '4px' }}>
-            {user?.stats?.surveysCompleted || 7} 🎯
+            {user?.stats?.surveysCompleted || 0} 🎯
           </div>
         </div>
       </div>

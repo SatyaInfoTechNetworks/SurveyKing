@@ -13,7 +13,6 @@ async function initDB() {
   const port = parseInt(process.env.MYSQL_PORT || '3314', 10);
   const user = process.env.MYSQL_USER || 'yellapusatyasai@gmail.com';
   const password = process.env.MYSQL_PASSWORD || '@SaiDivya2503';
-  const targetDb = process.env.MYSQL_DATABASE || 'surveyking';
 
   console.log(`🔌 Initializing Survey King MySQL Database connection...`);
 
@@ -48,50 +47,30 @@ async function initDB() {
 
     // Option B: Try Remote MySQL Database
     try {
-      // First try database 'surveyking'
       mysqlPool = mysql.createPool({
         host,
         port,
         user,
         password,
-        database: 'surveyking',
+        database: 'primary_db',
         waitForConnections: true,
         connectionLimit: 10,
         connectTimeout: 8000
       });
       const conn = await mysqlPool.getConnection();
-      console.log(`👑 Connected to Remote MySQL Database 'surveyking' at ${host}:${port}!`);
+      console.log(`👑 Connected to Remote MySQL Database 'primary_db' at ${host}:${port}!`);
       conn.release();
       dbMode = 'MYSQL';
-      activeDbName = 'surveyking';
-    } catch (remoteSurveyKingErr) {
-      console.log(`ℹ️ Remote database 'surveyking' restricted. Connecting to Remote MySQL 'primary_db'...`);
-      try {
-        mysqlPool = mysql.createPool({
-          host,
-          port,
-          user,
-          password,
-          database: 'primary_db',
-          waitForConnections: true,
-          connectionLimit: 10,
-          connectTimeout: 8000
-        });
-        const conn = await mysqlPool.getConnection();
-        console.log(`👑 Connected to Remote MySQL Database 'primary_db' at ${host}:${port}!`);
-        conn.release();
-        dbMode = 'MYSQL';
-        activeDbName = 'primary_db';
-      } catch (remotePrimaryErr) {
-        console.warn(`⚠️ Could not connect to remote MySQL:`, remotePrimaryErr.message);
-        console.log('🔄 Falling back to embedded SQLite database for local reliability...');
+      activeDbName = 'primary_db';
+    } catch (remotePrimaryErr) {
+      console.warn(`⚠️ Could not connect to remote MySQL:`, remotePrimaryErr.message);
+      console.log('🔄 Falling back to embedded SQLite database for local reliability...');
 
-        dbMode = 'SQLITE';
-        activeDbName = 'survey_king.sqlite';
-        const dbPath = path.join(__dirname, '..', 'survey_king.sqlite');
-        sqliteDb = new sqlite3.Database(dbPath);
-        console.log(`✅ Connected to SQLite database at ${dbPath}`);
-      }
+      dbMode = 'SQLITE';
+      activeDbName = 'survey_king.sqlite';
+      const dbPath = path.join(__dirname, '..', 'survey_king.sqlite');
+      sqliteDb = new sqlite3.Database(dbPath);
+      console.log(`✅ Connected to SQLite database at ${dbPath}`);
     }
   }
 
@@ -273,7 +252,7 @@ async function createTables() {
         referred_user_id INTEGER NOT NULL,
         referral_code TEXT NOT NULL,
         status TEXT DEFAULT 'PENDING',
-        reward_amount REAL DEFAULT 15.00,
+        reward_amount REAL DEFAULT 1500.00,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -290,41 +269,7 @@ async function createTables() {
     `);
   }
 
-  await seedSurveys();
   console.log(`✅ All database tables in '${activeDbName}' created and ready!`);
-}
-
-async function seedSurveys() {
-  // Update existing surveys to coins format if needed
-  await execute(`UPDATE surveys SET reward = 4000 WHERE survey_id = 'S101' AND reward <= 100`);
-  await execute(`UPDATE surveys SET reward = 6500 WHERE survey_id = 'S102' AND reward <= 100`);
-  await execute(`UPDATE surveys SET reward = 3000 WHERE survey_id = 'S103' AND reward <= 100`);
-  await execute(`UPDATE surveys SET reward = 9000 WHERE survey_id = 'S104' AND reward <= 100`);
-  await execute(`UPDATE surveys SET reward = 5000 WHERE survey_id = 'S105' AND reward <= 100`);
-  await execute(`UPDATE surveys SET reward = 12000 WHERE survey_id = 'S106' AND reward <= 100`);
-
-  const existing = await query(`SELECT COUNT(*) as cnt FROM surveys`);
-  const count = existing[0]?.cnt || existing[0]?.['COUNT(*)'] || 0;
-
-  if (count === 0) {
-    console.log(`🌱 Seeding default surveys into '${activeDbName}'...`);
-    const defaultSurveys = [
-      { survey_id: 'S101', title: 'Google Consumer Pulse', reward: 4000, estimated_minutes: 5, provider: 'Google', category: 'Technology', icon: '🔍' },
-      { survey_id: 'S102', title: 'Global Brand & Shopping Study', reward: 6500, estimated_minutes: 8, provider: 'CPX Research', category: 'Shopping', icon: '🛍️' },
-      { survey_id: 'S103', title: 'Food & Dining Preference Survey', reward: 3000, estimated_minutes: 4, provider: 'BitLabs', category: 'Lifestyle', icon: '🍔' },
-      { survey_id: 'S104', title: 'Tech Gadgets & Smartphone Feedback', reward: 9000, estimated_minutes: 12, provider: 'CPX Research', category: 'Gadgets', icon: '📱' },
-      { survey_id: 'S105', title: 'Streaming & OTT Habits 2026', reward: 5000, estimated_minutes: 6, provider: 'InBrain', category: 'Entertainment', icon: '🎬' },
-      { survey_id: 'S106', title: 'Financial & UPI Apps Satisfaction', reward: 12000, estimated_minutes: 15, provider: 'TheoremReach', category: 'Finance', icon: '💳' }
-    ];
-
-    for (const s of defaultSurveys) {
-      await execute(
-        `INSERT INTO surveys (survey_id, title, reward, estimated_minutes, provider, category, icon, active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
-        [s.survey_id, s.title, s.reward, s.estimated_minutes, s.provider, s.category, s.icon]
-      );
-    }
-    console.log(`✅ Default surveys seeded successfully into '${activeDbName}'!`);
-  }
 }
 
 function getMode() {
