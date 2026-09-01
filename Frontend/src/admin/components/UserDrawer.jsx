@@ -154,6 +154,54 @@ export default function UserDrawer({ user, onClose, onRefresh, onAdjustBalance, 
                 </div>
               </div>
 
+              {/* Full User Metadata Card */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '12px',
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>📋 Account Identification & Referral Details</span>
+                  <span style={{ fontSize: '0.75rem', color: '#f59e0b', fontFamily: 'monospace', background: 'rgba(245, 158, 11, 0.12)', padding: '2px 8px', borderRadius: '4px' }}>
+                    User #{user.id}
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.8rem' }}>
+                  <div style={{ background: 'rgba(0, 0, 0, 0.25)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                    <div style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.72rem', marginBottom: '2px' }}>Personal Referral Code</div>
+                    <div style={{ fontWeight: 800, color: '#f59e0b', fontSize: '0.95rem', fontFamily: 'monospace', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>{user.referralCode || 'N/A'}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'rgba(0, 0, 0, 0.25)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                    <div style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.72rem', marginBottom: '2px' }}>Referred By (Inviter)</div>
+                    <div style={{ fontWeight: 700, color: user.referredBy ? '#60a5fa' : '#94a3b8', fontSize: '0.85rem' }}>
+                      {user.referredBy ? `Invited by ${user.referredBy}` : 'DIRECT (Organic Join)'}
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'rgba(0, 0, 0, 0.25)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                    <div style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.72rem', marginBottom: '2px' }}>Joined Date & Time</div>
+                    <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.78rem' }}>
+                      {user.joinedAt ? new Date(user.joinedAt).toLocaleString([], { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'N/A'}
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'rgba(0, 0, 0, 0.25)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                    <div style={{ color: 'var(--text-muted, #64748b)', fontSize: '0.72rem', marginBottom: '2px' }}>Lifetime Earnings</div>
+                    <div style={{ fontWeight: 800, color: '#10b981', fontSize: '0.85rem' }}>
+                      +{parseFloat(user.wallet?.totalEarned || 0).toLocaleString()} 🪙 (₹{((user.wallet?.totalEarned || 0) / 100).toFixed(2)})
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Status & Risk Banner */}
               <div style={{
                 padding: '14px',

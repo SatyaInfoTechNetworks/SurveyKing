@@ -176,7 +176,9 @@ async function handleWebhook(req, res) {
     // Send Live Telegram Notification for Survey Completion
     notifySurveyReward(user.telegram_user_id, 'CPX Research Survey', rewardAmt, newBalance);
 
-    // Check Referral Qualifications
+        // ---------------------------------------------------------------
+    // 5. REFERRAL QUALIFICATION ENGINE (FIRST SURVEY TRIGGER)
+    // ---------------------------------------------------------------
     const settingsRows = await db.query('SELECT * FROM platform_settings WHERE id = 1');
     const refSettings = settingsRows[0] || { referrer_reward_coins: 1000, referee_reward_coins: 500, referral_trigger: 'FIRST_SURVEY', min_survey_reward_coins: 100 };
     const minSurveyReward = parseFloat(refSettings.min_survey_reward_coins || 100);
@@ -191,12 +193,11 @@ async function handleWebhook(req, res) {
         const referral = pendingRefs[0];
         const referrerId = referral.referrer_user_id;
         const referrerReward = parseFloat(refSettings.referrer_reward_coins || 1000);
-        const refereeReward = parseFloat(refSettings.referee_reward_coins || 500);
 
         // Qualify referral
         await db.execute(`UPDATE referrals SET status = 'QUALIFIED', reward_amount = ? WHERE id = ?`, [referrerReward, referral.id]);
 
-        // Credit Inviter
+        // Credit Inviter (Referrer)
         const referrers = await db.query(`SELECT * FROM users WHERE id = ?`, [referrerId]);
         if (referrers.length > 0) {
           const referrer = referrers[0];
@@ -207,28 +208,10 @@ async function handleWebhook(req, res) {
           await db.execute(
             `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
              VALUES (?, 'REFERRAL_REWARD', ?, ?, ?)`,
-            [referrer.id, referrerReward, `REF_${referral.id}`, `Referral bonus for inviting ${user.name}`]
+            [referrer.id, referrerReward, `REF_${referral.id}`, `Referral bonus: Friend ${user.name} completed first survey`]
           );
 
-          console.log(`👥 Referral Qualified! Credited ${referrerReward.toLocaleString()} Coins to Referrer ${referrer.name}`);
-          notifyReferralReward(referrer.telegram_user_id, referrerReward, referrerNewBalance, user.name);
-        }
-
-        // Credit Friend if referee bonus configured > 0
-        if (refereeReward > 0) {
-          const currentRefBalance = newBalance;
-          const updatedUserBalance = currentRefBalance + refereeReward;
-
-          await db.execute(`UPDATE users SET balance = ? WHERE id = ?`, [updatedUserBalance, user.id]);
-
-          await db.execute(
-            `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
-             VALUES (?, 'REFERRAL_WELCOME_BONUS', ?, ?, ?)`,
-            [user.id, refereeReward, `REF_WELCOME_${referral.id}`, `Referral Welcome Bonus for joining via invite`]
-          );
-
-          console.log(`🎁 Welcome Referral Bonus! Credited ${refereeReward.toLocaleString()} Coins to Referee ${user.name}`);
-          notifyReferralReward(user.telegram_user_id, refereeReward, updatedUserBalance, 'Welcome Bonus');
+          console.log(`👥 Referral Qualified! Credited ${referrerReward.toLocaleString()} Coins to Referrer ${referrer.name} (#${referrer.telegram_user_id})`);
         }
       }
     }
@@ -410,6 +393,47 @@ async function handleTimeWallWebhook(req, res) {
     );
 
     notifySurveyReward(user.telegram_user_id, coinAmount, newBalance, offerName);
+
+    // Referral Qualification Engine
+    try {
+      const settingsRows = await db.query('SELECT * FROM platform_settings WHERE id = 1');
+      const refSettings = settingsRows[0] || { referrer_reward_coins: 1000, referee_reward_coins: 500, referral_trigger: 'FIRST_SURVEY', min_survey_reward_coins: 100 };
+      const minSurveyReward = parseFloat(refSettings.min_survey_reward_coins || 100);
+
+      if (refSettings.referral_trigger === 'FIRST_SURVEY' && coinAmount >= minSurveyReward) {
+        const pendingRefs = await db.query(
+          `SELECT * FROM referrals WHERE referred_user_id = ? AND status = 'PENDING'`,
+          [user.id]
+        );
+
+        if (pendingRefs.length > 0) {
+          const referral = pendingRefs[0];
+          const referrerId = referral.referrer_user_id;
+          const referrerReward = parseFloat(refSettings.referrer_reward_coins || 1000);
+
+          await db.execute(`UPDATE referrals SET status = 'QUALIFIED', reward_amount = ? WHERE id = ?`, [referrerReward, referral.id]);
+
+          const referrers = await db.query(`SELECT * FROM users WHERE id = ?`, [referrerId]);
+          if (referrers.length > 0) {
+            const referrer = referrers[0];
+            const referrerNewBalance = parseFloat(referrer.balance || 0) + referrerReward;
+
+            await db.execute(`UPDATE users SET balance = ? WHERE id = ?`, [referrerNewBalance, referrer.id]);
+
+            await db.execute(
+              `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
+               VALUES (?, 'REFERRAL_REWARD', ?, ?, ?)`,
+              [referrer.id, referrerReward, `REF_TW_${referral.id}`, `Referral bonus: Friend ${user.name} completed first survey`]
+            );
+
+            console.log(`👥 Referral Qualified via TimeWall! Credited ${referrerReward.toLocaleString()} Coins to Referrer ${referrer.name}`);
+            notifyReferralReward(referrer.telegram_user_id, referrerReward, referrerNewBalance, user.name);
+          }
+        }
+      }
+    } catch (refErr) {
+      console.warn('⚠️ Could not process referral trigger for TimeWall:', refErr.message);
+    }
 
     await logPostback({ provider: 'TimeWall', transId: txId, tgUserId: user.telegram_user_id, offerId: offerName, statusParam: 'COMPLETED', rawStatus: rawType, amountLocal: coinAmount, amountUsd: revenueUsd, clientIp, idempotencyStatus: 'SUCCESS', errorReason: null, walletCredited: 1, startTime });
 
