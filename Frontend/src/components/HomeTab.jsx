@@ -92,30 +92,52 @@ export default function HomeTab({ user, surveys, onStartSurvey, onNavigate }) {
 
       {/* Quick Survey Cards */}
       {topSurveys.map((survey) => (
-        <div className="survey-card" key={survey.surveyId}>
-          <div className="survey-header">
-            <div className="survey-icon-title">
-              <div className="survey-icon">{survey.icon || '🎯'}</div>
-              <div>
-                <div className="survey-title">{survey.title}</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Provider: {survey.provider}</div>
+        <div className="survey-card" key={survey.surveyId} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+              <div className="survey-icon" style={{ flexShrink: 0 }}>{survey.icon || '🎯'}</div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div className="survey-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>
+                  {survey.title}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  Provider: <strong style={{ color: 'var(--accent-gold)' }}>{survey.provider}</strong>
+                </div>
               </div>
             </div>
-            <div className="survey-reward">+{survey.reward.toLocaleString()} 🪙</div>
+
+            <div style={{
+              background: 'rgba(245, 158, 11, 0.15)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              padding: '4px 10px',
+              borderRadius: '9999px',
+              color: '#f59e0b',
+              fontWeight: 800,
+              fontSize: '0.9rem',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              <span>+{survey.reward.toLocaleString()}</span>
+              <Coins size={14} color="#f59e0b" />
+            </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px dashed rgba(255, 255, 255, 0.08)', paddingTop: '10px', marginTop: '4px' }}>
-            <div className="survey-meta">
-              <span className="meta-item">⏱ {survey.estimatedMinutes} min</span>
-              <span className="meta-item" style={{ color: 'var(--accent-green)' }}>≈ ₹{(survey.reward / 100).toFixed(0)} INR</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px dashed rgba(255, 255, 255, 0.08)', paddingTop: '10px', marginTop: '12px' }}>
+            <div className="survey-meta" style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              <span className="meta-item" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Clock size={13} /> {survey.estimatedMinutes} min</span>
+              <span className="meta-item" style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-green)' }}>≈ ₹{(survey.reward / 100).toFixed(0)} INR</span>
             </div>
 
             <button 
               className="btn-primary" 
-              style={{ width: 'auto', padding: '8px 16px', fontSize: '0.85rem' }}
+              style={{ width: 'auto', padding: '8px 16px', fontSize: '0.8rem', flexShrink: 0 }}
               onClick={() => onStartSurvey(survey)}
             >
-              Start Survey
+              <Play size={13} fill="#000" />
+              <span>Start Survey</span>
             </button>
           </div>
         </div>

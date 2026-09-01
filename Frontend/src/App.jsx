@@ -249,15 +249,9 @@ export default function App() {
           }}>
             <Crown size={20} color="#000" />
           </div>
-          <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>
+          <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>
             SURVEY KING 👑
           </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', fontSize: '0.75rem', padding: '4px 10px' }}>
-            ⚡ 1,000 🪙 = ₹10
-          </span>
         </div>
       </header>
 

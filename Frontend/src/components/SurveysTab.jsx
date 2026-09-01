@@ -121,32 +121,51 @@ export default function SurveysTab({ surveys, cpxOfferwallUrl, onStartSurvey, ac
         </div>
       ) : (
         filteredSurveys.map(s => (
-          <div className="survey-card" key={s.surveyId}>
-            <div className="survey-header">
-              <div className="survey-icon-title">
-                <div className="survey-icon">{s.icon || '🎯'}</div>
-                <div>
-                  <div className="survey-title">{s.title}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+          <div className="survey-card" key={s.surveyId} style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                <div className="survey-icon" style={{ flexShrink: 0 }}>{s.icon || '🎯'}</div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div className="survey-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>
+                    {s.title}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     Provider: <strong style={{ color: 'var(--accent-gold)' }}>{s.provider}</strong> • {s.category || 'General'}
                   </div>
                 </div>
               </div>
-              <div className="survey-reward">+{s.reward.toLocaleString()} 🪙</div>
+
+              <div style={{
+                background: 'rgba(245, 158, 11, 0.15)',
+                border: '1px solid rgba(245, 158, 11, 0.35)',
+                padding: '4px 10px',
+                borderRadius: '9999px',
+                color: '#f59e0b',
+                fontWeight: 800,
+                fontSize: '0.9rem',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                <span>+{s.reward.toLocaleString()}</span>
+                <Coins size={14} color="#f59e0b" />
+              </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px dashed rgba(255, 255, 255, 0.08)', paddingTop: '10px' }}>
-              <div className="survey-meta">
-                <span className="meta-item"><Clock size={14} /> {s.estimatedMinutes} mins</span>
-                <span className="meta-item"><Coins size={14} color="var(--accent-gold)" /> ≈ ₹{(s.reward / 100).toFixed(0)} INR</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px dashed rgba(255, 255, 255, 0.08)', paddingTop: '10px', marginTop: '12px' }}>
+              <div className="survey-meta" style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                <span className="meta-item" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Clock size={13} /> {s.estimatedMinutes} mins</span>
+                <span className="meta-item" style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-green)' }}>≈ ₹{(s.reward / 100).toFixed(0)} INR</span>
               </div>
 
               <button
                 className="btn-primary"
-                style={{ width: 'auto', padding: '8px 18px', fontSize: '0.85rem' }}
+                style={{ width: 'auto', padding: '8px 16px', fontSize: '0.8rem', flexShrink: 0 }}
                 onClick={() => onStartSurvey(s)}
               >
-                <Play size={14} fill="#000" />
+                <Play size={13} fill="#000" />
                 <span>Start Survey</span>
               </button>
             </div>
