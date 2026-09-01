@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { User, Share2, Copy, Check, Users, ShieldAlert, Award, Gift } from 'lucide-react';
 
-export default function ProfileTab({ user, referrals, referralSettings, onCompleteWebhook }) {
+export default function ProfileTab({ user, referrals, referralSettings }) {
   const [copied, setCopied] = useState(false);
-  const [simulating, setSimulating] = useState(false);
 
   const referrerCoins = referralSettings?.referrerRewardCoins || 1000;
   const refereeCoins = referralSettings?.refereeRewardCoins || 500;

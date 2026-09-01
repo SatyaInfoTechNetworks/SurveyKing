@@ -148,30 +148,7 @@ export default function App() {
     }
   };
 
-  // Trigger Provider Webhook Completion
-  const handleCompleteWebhook = async (participationId, status = 'COMPLETED') => {
-    try {
-      const res = await fetch('/api/webhooks/surveys/cpx', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ participationId, status })
-      });
 
-      const data = await res.json();
-      if (data.success) {
-        if (user) {
-          loadUserData(user.telegramUserId);
-        }
-        if (activeParticipation?.participationId === participationId) {
-          setActiveParticipation(null);
-        }
-      }
-      return data;
-    } catch (err) {
-      console.error('Error triggering webhook:', err);
-      throw err;
-    }
-  };
 
   // Request Withdrawal Handler
   const handleRequestWithdrawal = async (amount, upiId, method = 'UPI') => {
@@ -298,7 +275,6 @@ export default function App() {
               user={user}
               referrals={referrals}
               referralSettings={referralSettings}
-              onCompleteWebhook={handleCompleteWebhook}
             />
           )}
 
