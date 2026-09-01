@@ -14,8 +14,28 @@ function initBot() {
   }
 
   try {
-    bot = new TelegramBot(token, { polling: true });
-    console.log('🤖 Survey King Telegram Bot INITIALIZED & LISTENING LIVE!');
+    bot = new TelegramBot(token, { polling: false });
+
+    // Clear any previous webhook or lingering sessions from previous container deployments
+    bot.deleteWebHook({ drop_pending_updates: true })
+      .then(() => {
+        bot.startPolling({ restart: true, interval: 300 });
+        console.log('🤖 Survey King Telegram Bot INITIALIZED & LISTENING LIVE!');
+      })
+      .catch((err) => {
+        console.warn('⚠️ Telegram deleteWebHook notice:', err.message);
+        bot.startPolling({ restart: true, interval: 300 });
+        console.log('🤖 Survey King Telegram Bot INITIALIZED & LISTENING LIVE!');
+      });
+
+    // Graceful error handler to prevent log spam during zero-downtime container rollover
+    bot.on('polling_error', (err) => {
+      if (err.code === 'ETELEGRAM' && err.message?.includes('409 Conflict')) {
+        // Transient conflict while previous container terminates, safely handled by next tick
+        return;
+      }
+      console.warn('⚠️ Telegram Bot Polling Notice:', err.message || err);
+    });
 
     // Handle Telegram /start command
     bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
