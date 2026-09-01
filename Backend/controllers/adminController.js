@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { notifyWithdrawalApproved, notifyWithdrawalRejected } = require('../bot/telegramBot');
 
 // GET /api/admin/stats
 async function getStats(req, res) {
@@ -214,6 +215,12 @@ async function processWithdrawal(req, res) {
       await db.execute("UPDATE withdrawals SET status = 'APPROVED' WHERE id = ?", [withdrawalId]);
       console.log(`✅ Approved Withdrawal ID ${withdrawalId} for ₹${(withdrawal.amount / 100).toFixed(2)} to ${withdrawal.upi_id}`);
 
+      // Send Live Telegram Notification to User for Approved Withdrawal
+      const users = await db.query('SELECT * FROM users WHERE id = ?', [withdrawal.user_id]);
+      if (users.length > 0) {
+        notifyWithdrawalApproved(users[0].telegram_user_id, (withdrawal.amount / 100).toFixed(2), withdrawal.upi_id, withdrawal.method || 'UPI');
+      }
+
       return res.json({
         success: true,
         message: `Withdrawal ID ${withdrawalId} APPROVED successfully! Payout of ₹${(withdrawal.amount / 100).toFixed(2)} marked as sent.`
@@ -235,6 +242,9 @@ async function processWithdrawal(req, res) {
            VALUES (?, 'WITHDRAWAL_REFUND', ?, ?, ?)`,
           [user.id, refundAmt, `REFUND_${withdrawalId}`, note || `Refund for rejected withdrawal #${withdrawalId}`]
         );
+
+        // Send Live Telegram Notification to User for Rejected Withdrawal & Refund
+        notifyWithdrawalRejected(user.telegram_user_id, refundAmt, withdrawal.upi_id, withdrawal.method || 'UPI');
       }
 
       console.log(`❌ Rejected Withdrawal ID ${withdrawalId} and refunded ${withdrawal.amount} Coins back to user wallet.`);

@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { notifySurveyReward, notifyReferralReward } = require('../bot/telegramBot');
 
 async function handleWebhook(req, res) {
   try {
@@ -74,6 +75,9 @@ async function handleWebhook(req, res) {
 
     console.log(`💰 Credited ${rewardAmt.toLocaleString()} Coins to User ${user.name} (ID: ${user.id}). New balance: ${newBalance.toLocaleString()} Coins`);
 
+    // Send Live Telegram Notification for Survey Completion
+    notifySurveyReward(user.telegram_user_id, participation.survey_id, rewardAmt, newBalance);
+
     // Fetch Dynamic Referral Settings from platform_settings table
     const settingsRows = await db.query('SELECT * FROM platform_settings WHERE id = 1');
     const refSettings = settingsRows[0] || { referrer_reward_coins: 1000, referee_reward_coins: 500, referral_trigger: 'FIRST_SURVEY', min_survey_reward_coins: 100 };
@@ -114,6 +118,9 @@ async function handleWebhook(req, res) {
 
             console.log(`👥 Referral Qualified! Credited ${referrerReward.toLocaleString()} Coins to Referrer ${referrer.name} (ID: ${referrer.id})`);
             referralBonusCredited = true;
+
+            // Send Telegram Notification to Referrer
+            notifyReferralReward(referrer.telegram_user_id, referrerReward, referrerNewBalance, user.name);
           }
 
           // 2. Credit Referee User if referee bonus is configured > 0
@@ -131,6 +138,9 @@ async function handleWebhook(req, res) {
 
             console.log(`🎁 Welcome Referral Bonus! Credited ${refereeReward.toLocaleString()} Coins to Referee ${user.name} (ID: ${user.id})`);
             refereeBonusCredited = true;
+
+            // Send Telegram Notification to Referee User
+            notifyReferralReward(user.telegram_user_id, refereeReward, updatedUserBalance, 'Welcome Bonus');
           }
         }
       } else {

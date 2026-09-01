@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, TrendingUp, ShieldCheck, Play, ArrowRight, Zap, Coins } from 'lucide-react';
+import { Sparkles, TrendingUp, ShieldCheck, Play, ArrowRight, Zap, Coins, Clock } from 'lucide-react';
 
 export default function HomeTab({ user, surveys, onStartSurvey, onNavigate }) {
   const topSurveys = surveys.slice(0, 3);
