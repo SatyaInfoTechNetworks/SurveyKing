@@ -6,6 +6,9 @@ export default function EarningsTab({ user, transactions, payoutMethods, onReque
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [selectedTier, setSelectedTier] = useState(null);
   const [accountDetails, setAccountDetails] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
+  const [bankIfscCode, setBankIfscCode] = useState('');
+  const [bankHolderName, setBankHolderName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState(null);
 
@@ -21,49 +24,61 @@ export default function EarningsTab({ user, transactions, payoutMethods, onReque
       icon: '⚡',
       placeholder: 'Enter UPI VPA (e.g. username@paytm)',
       tiers: [
-        { coins: 2500, rupees: 5 },
-        { coins: 5000, rupees: 10 },
-        { coins: 10000, rupees: 20 },
-        { coins: 25000, rupees: 50 },
-        { coins: 50000, rupees: 100 }
+        { coins: 1000, rupees: 10 },
+        { coins: 2500, rupees: 25 },
+        { coins: 5000, rupees: 50 },
+        { coins: 10000, rupees: 100 }
       ]
     },
     {
       id: 2,
+      methodId: 'BANK',
+      name: 'Bank Transfer (IMPS / NEFT)',
+      icon: '🏦',
+      placeholder: 'Bank Account & IFSC Code',
+      tiers: [
+        { coins: 1000, rupees: 10 },
+        { coins: 2500, rupees: 25 },
+        { coins: 5000, rupees: 50 },
+        { coins: 10000, rupees: 100 }
+      ]
+    },
+    {
+      id: 3,
       methodId: 'AMAZON',
       name: 'Amazon Pay Gift Card',
       icon: '🎁',
       placeholder: 'Enter Email or Mobile Number for Voucher',
       tiers: [
-        { coins: 2500, rupees: 5 },
-        { coins: 5000, rupees: 10 },
-        { coins: 10000, rupees: 20 },
-        { coins: 25000, rupees: 50 }
+        { coins: 1000, rupees: 10 },
+        { coins: 2500, rupees: 25 },
+        { coins: 5000, rupees: 50 },
+        { coins: 10000, rupees: 100 }
       ]
     },
     {
-      id: 3,
+      id: 4,
       methodId: 'PAYTM',
       name: 'Paytm Wallet Cash',
       icon: '📲',
       placeholder: 'Enter Paytm Registered Mobile Number',
       tiers: [
-        { coins: 2500, rupees: 5 },
-        { coins: 5000, rupees: 10 },
-        { coins: 10000, rupees: 20 },
-        { coins: 25000, rupees: 50 }
+        { coins: 1000, rupees: 10 },
+        { coins: 2500, rupees: 25 },
+        { coins: 5000, rupees: 50 },
+        { coins: 10000, rupees: 100 }
       ]
     },
     {
-      id: 4,
+      id: 5,
       methodId: 'GOOGLE_PLAY',
       name: 'Google Play Code',
       icon: '🎮',
       placeholder: 'Enter Email Address for Gift Code',
       tiers: [
-        { coins: 5000, rupees: 10 },
-        { coins: 10000, rupees: 20 },
-        { coins: 25000, rupees: 50 }
+        { coins: 1000, rupees: 10 },
+        { coins: 2500, rupees: 25 },
+        { coins: 5000, rupees: 50 }
       ]
     }
   ];
@@ -71,6 +86,7 @@ export default function EarningsTab({ user, transactions, payoutMethods, onReque
   const activeMethodObj = selectedMethod || methods[0];
   const activeTiers = activeMethodObj?.tiers || [];
   const activeTierObj = selectedTier || activeTiers[0];
+  const isBankMethod = activeMethodObj?.methodId === 'BANK' || activeMethodObj?.methodId === 'BANK_TRANSFER';
 
   const handleOpenWithdrawal = () => {
     if (methods.length > 0) {
@@ -98,17 +114,34 @@ export default function EarningsTab({ user, transactions, payoutMethods, onReque
       return;
     }
 
+    let finalDetails = accountDetails;
+    if (isBankMethod) {
+      if (!bankAccountNumber.trim() || !bankIfscCode.trim()) {
+        setMsg({ type: 'error', text: 'Please enter both Bank Account Number and IFSC Code.' });
+        return;
+      }
+      finalDetails = `A/C: ${bankAccountNumber.trim()} | IFSC: ${bankIfscCode.trim().toUpperCase()}${bankHolderName.trim() ? ` | Name: ${bankHolderName.trim()}` : ''}`;
+    } else {
+      if (!accountDetails.trim()) {
+        setMsg({ type: 'error', text: 'Please enter payout destination details.' });
+        return;
+      }
+    }
+
     setSubmitting(true);
     setMsg(null);
 
     try {
-      const res = await onRequestWithdrawal(activeTierObj.coins, accountDetails, activeMethodObj.methodId);
+      const res = await onRequestWithdrawal(activeTierObj.coins, finalDetails, activeMethodObj.methodId);
       if (res?.success) {
         setMsg({ type: 'success', text: res.message || 'Withdrawal requested successfully!' });
         setTimeout(() => {
           setShowModal(false);
           setMsg(null);
           setAccountDetails('');
+          setBankAccountNumber('');
+          setBankIfscCode('');
+          setBankHolderName('');
         }, 2000);
       } else {
         setMsg({ type: 'error', text: res?.error || 'Failed to request withdrawal' });
@@ -368,17 +401,65 @@ export default function EarningsTab({ user, transactions, payoutMethods, onReque
             )}
 
             <form onSubmit={handleWithdrawSubmit}>
-              <div className="input-group">
-                <label className="input-label">{activeMethodObj?.name} Destination</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  placeholder={activeMethodObj?.placeholder || 'Enter VPA / Number / Email'}
-                  value={accountDetails}
-                  onChange={(e) => setAccountDetails(e.target.value)}
-                  required
-                />
-              </div>
+              {isBankMethod ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span>🏦 Bank Account Number</span>
+                      <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="Enter Bank Account Number"
+                      value={bankAccountNumber}
+                      onChange={(e) => setBankAccountNumber(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span>⚡ Bank IFSC Code</span>
+                      <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="e.g. SBIN0001234 / HDFC0000123"
+                      value={bankIfscCode}
+                      onChange={(e) => setBankIfscCode(e.target.value.toUpperCase())}
+                      style={{ textTransform: 'uppercase', fontFamily: 'monospace', letterSpacing: '0.05em' }}
+                      required
+                    />
+                  </div>
+
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">
+                      <span>👤 Account Holder Full Name (Optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="Name registered with Bank"
+                      value={bankHolderName}
+                      onChange={(e) => setBankHolderName(e.target.value)}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="input-group">
+                  <label className="input-label">{activeMethodObj?.name} Destination</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder={activeMethodObj?.placeholder || 'Enter VPA / Number / Email'}
+                    value={accountDetails}
+                    onChange={(e) => setAccountDetails(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '16px' }}>
                 <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>

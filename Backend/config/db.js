@@ -346,6 +346,7 @@ async function seedDefaults() {
 
     const methods = [
       { method_id: 'UPI', name: 'UPI Transfer (VPA)', icon: '⚡', placeholder: 'Enter UPI VPA (e.g. username@paytm)', tiers_json: defaultTiers },
+      { method_id: 'BANK', name: 'Bank Transfer (IMPS / NEFT)', icon: '🏦', placeholder: 'Bank Account & IFSC Code', tiers_json: defaultTiers },
       { method_id: 'AMAZON', name: 'Amazon Pay Gift Card', icon: '🎁', placeholder: 'Enter Email or Mobile Number', tiers_json: defaultTiers },
       { method_id: 'PAYTM', name: 'Paytm Wallet Cash', icon: '📲', placeholder: 'Enter Paytm Registered Mobile Number', tiers_json: defaultTiers },
       { method_id: 'GOOGLE_PLAY', name: 'Google Play Gift Code', icon: '🎮', placeholder: 'Enter Email Address for Voucher Code', tiers_json: defaultTiers }
@@ -358,6 +359,25 @@ async function seedDefaults() {
       );
     }
     console.log('✅ Default Payout Methods & Tiers initialized!');
+  } else {
+    // Check if BANK method is missing in existing table
+    try {
+      const bankExists = await query("SELECT id FROM payout_methods WHERE method_id = 'BANK'");
+      if (bankExists.length === 0) {
+        const defaultTiers = JSON.stringify([
+          { coins: 1000, rupees: 10 },
+          { coins: 2500, rupees: 25 },
+          { coins: 5000, rupees: 50 },
+          { coins: 10000, rupees: 100 }
+        ]);
+        await execute(
+          `INSERT INTO payout_methods (method_id, name, icon, placeholder, tiers_json, active)
+           VALUES ('BANK', 'Bank Transfer (IMPS / NEFT)', '🏦', 'Bank Account & IFSC Code', ?, 1)`,
+          [defaultTiers]
+        );
+        console.log('✅ Bank Transfer Payout Method added to existing database!');
+      }
+    } catch (bErr) {}
   }
 
   // 3. Seed Super Admin User if empty
