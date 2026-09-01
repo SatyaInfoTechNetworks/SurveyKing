@@ -280,7 +280,59 @@ async function getSurveys(req, res) {
       console.error('Error fetching CPX API:', cpxErr.message);
     }
 
-    // Only custom surveys created by admin in admin panel
+    // Fetch Live TimeWall Surveys if API key is configured
+    let liveTimeWallSurveys = [];
+    const timeWallApiKey = process.env.TIMEWALL_API_KEY || '';
+    if (timeWallApiKey) {
+      try {
+        console.log(`⏱️ [FETCHING TIMEWALL SURVEYS API] User: ${tgUserId}`);
+        const twRes = await fetch('https://api.timewall.io/get-surveys', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${timeWallApiKey}`
+          },
+          body: JSON.stringify({
+            uid: String(tgUserId),
+            ip: clientIp,
+            user_agent: userAgent,
+            screen_width: 390,
+            screen_height: 844,
+            limit: 10,
+            provider: 'all'
+          })
+        });
+
+        const twData = await twRes.json();
+        if (twData && twData.success && Array.isArray(twData.surveys) && twData.surveys.length > 0) {
+          liveTimeWallSurveys = twData.surveys.map(s => {
+            const coinAmount = parseFloat(s.currency_amount || 0) > 0 
+              ? parseFloat(s.currency_amount) 
+              : Math.round(parseFloat(s.usd_rate || 0.50) * 4500);
+
+            return {
+              id: `tw_${s.id}`,
+              surveyId: String(s.id),
+              title: `TimeWall Study #${String(s.id).substring(0, 8)}`,
+              reward: coinAmount,
+              estimatedMinutes: parseInt(s.loi || 10, 10),
+              provider: 'TimeWall',
+              category: 'Market Research',
+              rating: 4.8,
+              score: '10.0',
+              icon: '⏱️',
+              href: s.link,
+              isLiveTimeWall: true
+            };
+          });
+          console.log(`✅ Loaded ${liveTimeWallSurveys.length} live TimeWall surveys for user ${tgUserId}!`);
+        }
+      } catch (twErr) {
+        console.error('Error fetching TimeWall API:', twErr.message);
+      }
+    }
+
+    // Only custom surveys created by admin in admin panel (if any)
     const customSurveys = await db.query('SELECT * FROM surveys WHERE active = 1 ORDER BY priority DESC, reward DESC');
     const formattedCustom = customSurveys.map(s => ({
       id: s.id,
@@ -295,7 +347,7 @@ async function getSurveys(req, res) {
       isLiveCPX: false
     }));
 
-    const allSurveys = [...liveCpxSurveys, ...formattedCustom];
+    const allSurveys = [...liveCpxSurveys, ...liveTimeWallSurveys, ...formattedCustom];
 
     return res.json({
       success: true,
