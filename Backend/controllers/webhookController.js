@@ -5,15 +5,15 @@ async function handleWebhook(req, res) {
   const startTime = Date.now();
   const provider = (req.params.provider || 'cpx').toLowerCase();
 
-  // Map CPX Research parameters
-  const transId = req.query.trans_id || req.body.trans_id || req.query.participationId || req.body.participationId;
-  const rawStatus = String(req.query.status || req.body.status || '1');
+  // Map CPX Research parameters (Full names and ultra-short names)
+  const transId = req.query.t || req.query.trans_id || req.body.t || req.body.trans_id || req.query.participationId || req.body.participationId;
+  const rawStatus = String(req.query.s || req.query.status || req.body.s || req.body.status || '1').trim();
   const statusParam = (rawStatus === '1' || rawStatus.toUpperCase() === 'COMPLETED') ? 'COMPLETED' : 'CANCELED';
-  const tgUserId = req.query.user_id || req.body.user_id;
-  const offerId = req.query.offer_id || req.body.offer_id || 'CPX_OFFER';
-  const amountLocal = parseFloat(req.query.amount_local || req.body.amount_local || 0);
-  const amountUsd = parseFloat(req.query.amount_usd || req.body.amount_usd || 0);
-  const hash = req.query.hash || req.body.hash;
+  const tgUserId = (req.query.u || req.query.user_id || req.body.u || req.body.user_id || req.query.ext_user_id || req.body.ext_user_id || '').toString().trim();
+  const offerId = req.query.o || req.query.offer_id || req.body.o || req.body.offer_id || 'CPX_OFFER';
+  const amountLocal = parseFloat(req.query.a || req.query.amount_local || req.body.a || req.body.amount_local || 0);
+  const amountUsd = parseFloat(req.query.usd || req.query.amount_usd || req.body.usd || req.body.amount_usd || 0);
+  const hash = req.query.h || req.query.hash || req.query.secure_hash || req.body.h || req.body.hash;
 
   const clientIp = req.clientIp || req.headers['x-forwarded-for']?.split(',')[0].trim() || req.headers['cf-connecting-ip'] || req.socket.remoteAddress || '127.0.0.1';
 
