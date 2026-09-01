@@ -28,57 +28,67 @@ async function initDB() {
   const portsToTry = [envPort, 3306, 3314];
   const usersToTry = [
     { u: envUser, p: envPass },
+    { u: 'root', p: envPass },
+    { u: 'root', p: '@SaiDivya2503' },
     { u: 'root', p: 'root' }
   ];
 
+  const databaseCandidates = [
+    process.env.MYSQL_DATABASE,
+    'surveyking'
+  ].filter(Boolean);
+
   let connected = false;
 
-  for (const h of hostsToTry) {
+  for (const dbName of databaseCandidates) {
     if (connected) break;
-    for (const prt of portsToTry) {
+    for (const h of hostsToTry) {
       if (connected) break;
-      for (const cred of usersToTry) {
-        console.log(`🔄 Attempting MySQL connection candidate -> Host: ${h}:${prt} | User: ${cred.u}...`);
-        try {
-          // Attempt CREATE DATABASE IF NOT EXISTS 'surveyking'
+      for (const prt of portsToTry) {
+        if (connected) break;
+        for (const cred of usersToTry) {
+          console.log(`🔄 Attempting MySQL connection -> Host: ${h}:${prt} | User: ${cred.u} | DB: ${dbName}...`);
           try {
-            const rootConn = await mysql.createConnection({
+            // Attempt CREATE DATABASE IF NOT EXISTS dbName
+            try {
+              const rootConn = await mysql.createConnection({
+                host: h,
+                port: prt,
+                user: cred.u,
+                password: cred.p,
+                connectTimeout: 2000
+              });
+              await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\`;`);
+              await rootConn.end();
+            } catch (createDbErr) {
+              // Ignore privilege error if DB already exists
+            }
+
+            const testPool = mysql.createPool({
               host: h,
               port: prt,
               user: cred.u,
               password: cred.p,
-              connectTimeout: 2000
+              database: dbName,
+              waitForConnections: true,
+              connectionLimit: 10,
+              connectTimeout: 3000
             });
-            await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${database}\`;`);
-            await rootConn.end();
-            console.log(`📦 Ensured database '${database}' exists on ${h}:${prt}`);
-          } catch (createDbErr) {
-            // Ignore privilege error if DB already exists or user lacks CREATE DB permission
+
+            const conn = await testPool.getConnection();
+            console.log(`====================================================`);
+            console.log(`👑 SUCCESS! Connected to MySQL Database '${dbName}'`);
+            console.log(`📍 Host: ${h}:${prt} | User: ${cred.u}`);
+            console.log(`====================================================`);
+            conn.release();
+
+            mysqlPool = testPool;
+            activeDbName = dbName;
+            connected = true;
+            break;
+          } catch (err) {
+            console.warn(`❌ MySQL candidate failed (${h}:${prt} - ${cred.u} - ${dbName}): ${err.message}`);
           }
-
-          const testPool = mysql.createPool({
-            host: h,
-            port: prt,
-            user: cred.u,
-            password: cred.p,
-            database,
-            waitForConnections: true,
-            connectionLimit: 10,
-            connectTimeout: 3000
-          });
-
-          const conn = await testPool.getConnection();
-          console.log(`====================================================`);
-          console.log(`👑 SUCCESS! Connected to Dokploy MySQL Database '${database}'`);
-          console.log(`📍 Host: ${h}:${prt} | User: ${cred.u}`);
-          console.log(`====================================================`);
-          conn.release();
-
-          mysqlPool = testPool;
-          connected = true;
-          break;
-        } catch (err) {
-          console.warn(`❌ MySQL candidate failed (${h}:${prt} - ${cred.u}): ${err.message}`);
         }
       }
     }
