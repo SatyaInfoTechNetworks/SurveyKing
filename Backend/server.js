@@ -87,10 +87,13 @@ app.get('/api/telegram/referrals', telegramController.getReferrals);
 app.post('/api/telegram/withdraw', telegramController.requestWithdrawal);
 
 // Webhook APIs (CPX Research & Partners)
-app.all('/api/webhooks/surveys/:provider', webhookController.handleWebhook);
-app.all('/api/webhooks/surveys/cpx', webhookController.handleWebhook);
+app.all('/cpx', webhookController.handleWebhook);
+app.all('/api/cpx', webhookController.handleWebhook);
+app.all('/postback', webhookController.handleWebhook);
+app.all('/api/postback', webhookController.handleWebhook);
 app.all('/api/webhooks/cpx', webhookController.handleWebhook);
-app.all('/api/cpx/postback', webhookController.handleWebhook);
+app.all('/api/webhooks/surveys/cpx', webhookController.handleWebhook);
+app.all('/api/webhooks/surveys/:provider', webhookController.handleWebhook);
 
 // Admin APIs (All 12 Modules)
 // 1. Dashboard
