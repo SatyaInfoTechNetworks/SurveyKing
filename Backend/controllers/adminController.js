@@ -1264,6 +1264,25 @@ async function deletePayoutMethod(req, res) {
   }
 }
 
+async function getPayoutMethods(req, res) {
+  try {
+    const rows = await db.query('SELECT * FROM payout_methods ORDER BY id ASC');
+    const formatted = rows.map(m => ({
+      id: m.id,
+      methodId: m.method_id,
+      name: m.name,
+      icon: m.icon,
+      placeholder: m.placeholder,
+      active: m.active === 1 || m.active === true,
+      tiers: typeof m.tiers_json === 'string' ? JSON.parse(m.tiers_json || '[]') : (m.tiers_json || [])
+    }));
+    return res.json({ success: true, payoutMethods: formatted });
+  } catch (err) {
+    console.error('Error in getPayoutMethods:', err);
+    return res.status(500).json({ error: 'Failed to fetch payout methods' });
+  }
+}
+
 module.exports = {
   getDashboardStats,
   getUsers,
@@ -1292,6 +1311,7 @@ module.exports = {
   getAnalytics,
   getAuditLogs,
   getSettings,
+  getPayoutMethods,
   createPayoutMethod,
   updatePayoutMethod,
   deletePayoutMethod

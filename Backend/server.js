@@ -162,6 +162,8 @@ app.get('/api/admin/audit-logs', adminController.getAuditLogs);
 
 // 12. Settings & Payout Methods
 app.get('/api/admin/settings', adminController.getSettings);
+app.get('/api/admin/payout-methods', adminController.getPayoutMethods);
+app.get('/api/telegram/payout-methods', adminController.getPayoutMethods);
 app.post('/api/admin/payout-methods', adminController.createPayoutMethod);
 app.put('/api/admin/payout-methods/:id', adminController.updatePayoutMethod);
 app.delete('/api/admin/payout-methods/:id', adminController.deletePayoutMethod);
