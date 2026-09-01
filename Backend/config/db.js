@@ -16,62 +16,51 @@ async function initDB() {
 
   console.log(`🔌 Initializing Survey King MySQL Database connection...`);
 
-  // Option A: Try Local MySQL with database 'surveyking'
-  try {
-    const localConn = await mysql.createConnection({
-      host: 'localhost',
-      port: 3306,
-      user: 'root',
-      password: 'root'
-    });
-    await localConn.query(`CREATE DATABASE IF NOT EXISTS \`surveyking\`;`);
-    await localConn.end();
+  // Try MySQL Connection Candidates
+  const hostsToTry = [
+    process.env.MYSQL_HOST,
+    '72.61.254.236',
+    '172.17.0.1',
+    'host.docker.internal',
+    'localhost'
+  ].filter(Boolean);
 
-    mysqlPool = mysql.createPool({
-      host: 'localhost',
-      port: 3306,
-      user: 'root',
-      password: 'root',
-      database: 'surveyking',
-      waitForConnections: true,
-      connectionLimit: 10
-    });
+  let connected = false;
 
-    const conn = await mysqlPool.getConnection();
-    console.log(`👑 Connected to MySQL Database 'surveyking' on localhost:3306!`);
-    conn.release();
-    dbMode = 'MYSQL';
-    activeDbName = 'surveyking';
-  } catch (localErr) {
-    console.log(`ℹ️ Local MySQL unavailable (${localErr.message}). Connecting to Remote Hostinger MySQL...`);
-
-    // Option B: Try Remote MySQL Database
+  for (const h of hostsToTry) {
     try {
-      mysqlPool = mysql.createPool({
-        host,
-        port,
-        user,
-        password,
-        database: 'primary_db',
+      const testPool = mysql.createPool({
+        host: h,
+        port: h === 'localhost' ? 3306 : port,
+        user: h === 'localhost' ? 'root' : user,
+        password: h === 'localhost' ? 'root' : password,
+        database: h === 'localhost' ? 'surveyking' : 'primary_db',
         waitForConnections: true,
         connectionLimit: 10,
-        connectTimeout: 8000
+        connectTimeout: 3000
       });
-      const conn = await mysqlPool.getConnection();
-      console.log(`👑 Connected to Remote MySQL Database 'primary_db' at ${host}:${port}!`);
-      conn.release();
-      dbMode = 'MYSQL';
-      activeDbName = 'primary_db';
-    } catch (remotePrimaryErr) {
-      console.warn(`⚠️ Could not connect to remote MySQL:`, remotePrimaryErr.message);
-      console.log('🔄 Falling back to embedded SQLite database for local reliability...');
 
-      dbMode = 'SQLITE';
-      activeDbName = 'survey_king.sqlite';
-      const dbPath = path.join(__dirname, '..', 'survey_king.sqlite');
-      sqliteDb = new sqlite3.Database(dbPath);
-      console.log(`✅ Connected to SQLite database at ${dbPath}`);
+      const conn = await testPool.getConnection();
+      console.log(`👑 Connected to MySQL Database at ${h}:${h === 'localhost' ? 3306 : port}!`);
+      conn.release();
+
+      mysqlPool = testPool;
+      dbMode = 'MYSQL';
+      activeDbName = h === 'localhost' ? 'surveyking' : 'primary_db';
+      connected = true;
+      break;
+    } catch (err) {
+      // Try next host candidate
     }
+  }
+
+  if (!connected) {
+    console.log('🔄 Falling back to embedded SQLite database for local reliability...');
+    dbMode = 'SQLITE';
+    activeDbName = 'survey_king.sqlite';
+    const dbPath = path.join(__dirname, '..', 'survey_king.sqlite');
+    sqliteDb = new sqlite3.Database(dbPath);
+    console.log(`✅ Connected to SQLite database at ${dbPath}`);
   }
 
   await createTables();
