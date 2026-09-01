@@ -26,6 +26,9 @@ async function handleAuth(req, res) {
     let user;
     if (users.length > 0) {
       user = users[0];
+      if (user.status === 'BANNED') {
+        return res.status(403).json({ error: 'Your account has been banned from Survey King due to policy violations.' });
+      }
       if (name || username) {
         await db.execute('UPDATE users SET name = ?, username = ? WHERE id = ?', [
           name || user.name,
@@ -189,6 +192,9 @@ async function startSurvey(req, res) {
       return res.status(404).json({ error: 'User not found' });
     }
     const user = users[0];
+    if (user.status === 'BANNED') {
+      return res.status(403).json({ error: 'Your account is banned. You cannot take surveys.' });
+    }
 
     const surveys = await db.query('SELECT * FROM surveys WHERE survey_id = ? OR id = ?', [surveyId, surveyId]);
     if (surveys.length === 0) {

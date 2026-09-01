@@ -6,6 +6,7 @@ require('dotenv').config();
 const db = require('./config/db');
 const telegramController = require('./controllers/telegramController');
 const webhookController = require('./controllers/webhookController');
+const adminController = require('./controllers/adminController');
 const { initBot } = require('./bot/telegramBot');
 
 const app = express();
@@ -41,9 +42,21 @@ app.get('/api/telegram/transactions', telegramController.getTransactions);
 app.get('/api/telegram/referrals', telegramController.getReferrals);
 app.post('/api/telegram/withdraw', telegramController.requestWithdrawal);
 
-// Webhook APIs (for survey completion callbacks)
+// Webhook APIs
 app.post('/api/webhooks/surveys/:provider', webhookController.handleWebhook);
 app.get('/api/webhooks/surveys/:provider', webhookController.handleWebhook);
+
+// Admin APIs
+app.get('/api/admin/stats', adminController.getStats);
+app.get('/api/admin/users', adminController.getUsers);
+app.post('/api/admin/users/:id/status', adminController.updateUserStatus);
+app.post('/api/admin/users/:id/balance', adminController.updateUserBalance);
+app.get('/api/admin/withdrawals', adminController.getWithdrawals);
+app.post('/api/admin/withdrawals/:id/action', adminController.processWithdrawal);
+app.get('/api/admin/surveys', telegramController.getSurveys);
+app.post('/api/admin/surveys', adminController.createSurvey);
+app.put('/api/admin/surveys/:id', adminController.updateSurvey);
+app.delete('/api/admin/surveys/:id', adminController.deleteSurvey);
 
 // Start Server
 async function startServer() {

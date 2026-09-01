@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Target, Wallet, User, Crown } from 'lucide-react';
+import { Home, Target, Wallet, User, Crown, Shield } from 'lucide-react';
 import HomeTab from './components/HomeTab';
 import SurveysTab from './components/SurveysTab';
 import EarningsTab from './components/EarningsTab';
 import ProfileTab from './components/ProfileTab';
+import AdminPanel from './components/AdminPanel';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
+  const [showAdmin, setShowAdmin] = useState(false);
   const [user, setUser] = useState(null);
   const [surveys, setSurveys] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -188,75 +190,107 @@ export default function App() {
 
   return (
     <div style={{ width: '100%', minHeight: '100vh', position: 'relative' }}>
-      {/* Tab Screen Content */}
-      {activeTab === 'home' && (
-        <HomeTab
-          user={user}
-          surveys={surveys}
-          onStartSurvey={handleStartSurvey}
-          onNavigate={(tab) => setActiveTab(tab)}
-        />
+      {/* Admin Quick Launch Floating Button */}
+      <button
+        onClick={() => setShowAdmin(!showAdmin)}
+        style={{
+          position: 'fixed',
+          top: '12px',
+          right: '12px',
+          zIndex: 150,
+          background: showAdmin ? '#ef4444' : 'rgba(245, 158, 11, 0.2)',
+          border: `1px solid ${showAdmin ? '#ef4444' : 'var(--accent-gold)'}`,
+          color: showAdmin ? '#fff' : 'var(--accent-gold)',
+          padding: '6px 12px',
+          borderRadius: '9999px',
+          fontSize: '0.75rem',
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          cursor: 'pointer',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)'
+        }}
+      >
+        <Shield size={14} />
+        <span>{showAdmin ? 'Close Admin' : '👑 Admin Panel'}</span>
+      </button>
+
+      {showAdmin ? (
+        <AdminPanel onClose={() => setShowAdmin(false)} />
+      ) : (
+        <>
+          {/* Tab Screen Content */}
+          {activeTab === 'home' && (
+            <HomeTab
+              user={user}
+              surveys={surveys}
+              onStartSurvey={handleStartSurvey}
+              onNavigate={(tab) => setActiveTab(tab)}
+            />
+          )}
+
+          {activeTab === 'surveys' && (
+            <SurveysTab
+              surveys={surveys}
+              onStartSurvey={handleStartSurvey}
+              activeParticipation={activeParticipation}
+              onCompleteWebhook={handleCompleteWebhook}
+            />
+          )}
+
+          {activeTab === 'earnings' && (
+            <EarningsTab
+              user={user}
+              transactions={transactions}
+              onRequestWithdrawal={handleRequestWithdrawal}
+            />
+          )}
+
+          {activeTab === 'profile' && (
+            <ProfileTab
+              user={user}
+              referrals={referrals}
+              onCompleteWebhook={handleCompleteWebhook}
+            />
+          )}
+
+          {/* Bottom Fixed Navigation Bar */}
+          <nav className="bottom-nav">
+            <button
+              className={`nav-item ${activeTab === 'home' ? 'active' : ''}`}
+              onClick={() => setActiveTab('home')}
+            >
+              <Home size={22} />
+              <span>Home</span>
+            </button>
+
+            <button
+              className={`nav-item ${activeTab === 'surveys' ? 'active' : ''}`}
+              onClick={() => setActiveTab('surveys')}
+            >
+              <Target size={22} />
+              <span>Surveys</span>
+            </button>
+
+            <button
+              className={`nav-item ${activeTab === 'earnings' ? 'active' : ''}`}
+              onClick={() => setActiveTab('earnings')}
+            >
+              <Wallet size={22} />
+              <span>Earnings</span>
+            </button>
+
+            <button
+              className={`nav-item ${activeTab === 'profile' ? 'active' : ''}`}
+              onClick={() => setActiveTab('profile')}
+            >
+              <User size={22} />
+              <span>Profile</span>
+            </button>
+          </nav>
+        </>
       )}
-
-      {activeTab === 'surveys' && (
-        <SurveysTab
-          surveys={surveys}
-          onStartSurvey={handleStartSurvey}
-          activeParticipation={activeParticipation}
-          onCompleteWebhook={handleCompleteWebhook}
-        />
-      )}
-
-      {activeTab === 'earnings' && (
-        <EarningsTab
-          user={user}
-          transactions={transactions}
-          onRequestWithdrawal={handleRequestWithdrawal}
-        />
-      )}
-
-      {activeTab === 'profile' && (
-        <ProfileTab
-          user={user}
-          referrals={referrals}
-          onCompleteWebhook={handleCompleteWebhook}
-        />
-      )}
-
-      {/* Bottom Fixed Navigation Bar */}
-      <nav className="bottom-nav">
-        <button
-          className={`nav-item ${activeTab === 'home' ? 'active' : ''}`}
-          onClick={() => setActiveTab('home')}
-        >
-          <Home size={22} />
-          <span>Home</span>
-        </button>
-
-        <button
-          className={`nav-item ${activeTab === 'surveys' ? 'active' : ''}`}
-          onClick={() => setActiveTab('surveys')}
-        >
-          <Target size={22} />
-          <span>Surveys</span>
-        </button>
-
-        <button
-          className={`nav-item ${activeTab === 'earnings' ? 'active' : ''}`}
-          onClick={() => setActiveTab('earnings')}
-        >
-          <Wallet size={22} />
-          <span>Earnings</span>
-        </button>
-
-        <button
-          className={`nav-item ${activeTab === 'profile' ? 'active' : ''}`}
-          onClick={() => setActiveTab('profile')}
-        >
-          <User size={22} />
-          <span>Profile</span>
-        </button>
-      </nav>
     </div>
   );
 }
