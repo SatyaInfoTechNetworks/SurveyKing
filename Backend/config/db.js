@@ -4,15 +4,6 @@ require('dotenv').config();
 let mysqlPool = null;
 
 async function initDB() {
-  const host = process.env.MYSQL_HOST || '72.61.254.236';
-  const port = parseInt(process.env.MYSQL_PORT || '3314', 10);
-  const user = process.env.MYSQL_USER || 'yellapusatyasai@gmail.com';
-  const password = process.env.MYSQL_PASSWORD || '@SaiDivya2503';
-  const database = process.env.MYSQL_DATABASE || 'surveyking';
-
-  console.log(`🔌 Initializing Survey King STRICT MySQL Database connection...`);
-
-  // Internal Docker & Host MySQL Candidate Combinations
   const envHost = process.env.MYSQL_HOST;
   const envPort = parseInt(process.env.MYSQL_PORT || '3314', 10);
   const envUser = process.env.MYSQL_USER || 'yellapusatyasai@gmail.com';
@@ -189,6 +180,8 @@ async function createTables() {
     ) ENGINE=InnoDB;
   `);
 
+  try { await mysqlPool.execute(`ALTER TABLE withdrawals ADD COLUMN method VARCHAR(50) DEFAULT 'UPI';`); } catch (e) {}
+
   await mysqlPool.execute(`
     CREATE TABLE IF NOT EXISTS platform_settings (
       id INT PRIMARY KEY DEFAULT 1,
@@ -199,6 +192,23 @@ async function createTables() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB;
   `);
+
+  try { await mysqlPool.execute(`ALTER TABLE platform_settings ADD COLUMN min_survey_reward_coins INT DEFAULT 100;`); } catch (e) {}
+
+  // Check if payout_methods has method_id column, recreate if outdated
+  try {
+    await mysqlPool.execute('SELECT method_id FROM payout_methods LIMIT 1');
+  } catch (colErr) {
+    console.log('🔄 Rebuilding payout_methods table schema...');
+    try {
+      await mysqlPool.execute('SET FOREIGN_KEY_CHECKS = 0');
+      await mysqlPool.execute('DROP TABLE IF EXISTS payout_tiers');
+      await mysqlPool.execute('DROP TABLE IF EXISTS payout_methods');
+      await mysqlPool.execute('SET FOREIGN_KEY_CHECKS = 1');
+    } catch (dropErr) {
+      console.warn('Notice dropping payout tables:', dropErr.message);
+    }
+  }
 
   await mysqlPool.execute(`
     CREATE TABLE IF NOT EXISTS payout_methods (
