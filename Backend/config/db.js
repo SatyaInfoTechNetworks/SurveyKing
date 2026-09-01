@@ -18,15 +18,15 @@ async function initDB() {
 
   const hostsToTry = [
     process.env.MYSQL_HOST,
-    'databases-masterdb-ilm2d7',
     '72.61.254.236',
+    'databases-masterdb-ilm2d7',
     'localhost'
   ].filter(Boolean);
 
   const portsToTry = [
-    parseInt(process.env.MYSQL_PORT || '3306', 10),
-    3306,
-    3314
+    parseInt(process.env.MYSQL_PORT || '3314', 10),
+    3314,
+    3306
   ];
 
   const usersToTry = [

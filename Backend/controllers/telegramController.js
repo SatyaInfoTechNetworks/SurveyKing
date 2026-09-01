@@ -32,6 +32,12 @@ async function handleAuth(req, res) {
     // Check if user exists
     const users = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [tgIdStr]);
 
+    // Fetch dynamic referral & welcome bonus settings
+    const settingsRows = await db.query('SELECT * FROM platform_settings WHERE id = 1');
+    const refSettings = settingsRows[0] || { referrer_reward_coins: 1000, referee_reward_coins: 500, referral_trigger: 'FIRST_SURVEY' };
+    const welcomeBonusCoins = parseFloat(refSettings.referee_reward_coins || 500);
+    const referrerBonusCoins = parseFloat(refSettings.referrer_reward_coins || 1000);
+
     let user;
     if (users.length > 0) {
       user = users[0];
@@ -47,6 +53,25 @@ async function handleAuth(req, res) {
         user.name = name || user.name;
         user.username = username || user.username;
       }
+
+      // Check if user has not yet received their Welcome Bonus (e.g. signed up earlier)
+      const existingBonus = await db.query(
+        "SELECT id FROM wallet_transactions WHERE user_id = ? AND type IN ('WELCOME_BONUS', 'REFERRAL_WELCOME_BONUS')",
+        [user.id]
+      );
+      if (existingBonus.length === 0 && welcomeBonusCoins > 0) {
+        const currentBal = parseFloat(user.balance || 0);
+        const newBal = currentBal + welcomeBonusCoins;
+        await db.execute('UPDATE users SET balance = ? WHERE id = ?', [newBal, user.id]);
+        await db.execute(
+          `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
+           VALUES (?, 'WELCOME_BONUS', ?, 'WELCOME_NEW_USER', 'Welcome Bonus for joining Survey King')`,
+          [user.id, welcomeBonusCoins]
+        );
+        user.balance = newBal;
+        console.log(`🎁 Welcome Bonus of +${welcomeBonusCoins} Coins automatically credited to user ${user.name} (#${user.telegram_user_id})!`);
+        notifyReferralReward(user.telegram_user_id, welcomeBonusCoins, newBal, 'Welcome Bonus');
+      }
     } else {
       let myRefCode = generateReferralCode();
       let existingCode = await db.query('SELECT id FROM users WHERE referral_code = ?', [myRefCode]);
@@ -55,24 +80,15 @@ async function handleAuth(req, res) {
         existingCode = await db.query('SELECT id FROM users WHERE referral_code = ?', [myRefCode]);
       }
 
-      // Fetch dynamic referral settings to check joining bonus
-      const settingsRows = await db.query('SELECT * FROM platform_settings WHERE id = 1');
-      const refSettings = settingsRows[0] || { referrer_reward_coins: 1000, referee_reward_coins: 500, referral_trigger: 'FIRST_SURVEY' };
-      const joiningBonusCoins = parseFloat(refSettings.referee_reward_coins || 500);
-      const referrerBonusCoins = parseFloat(refSettings.referrer_reward_coins || 1000);
-
-      let initialBalance = 0.00;
       let validReferrer = null;
-
       if (referralCode && referralCode !== myRefCode) {
         const referrers = await db.query('SELECT * FROM users WHERE referral_code = ?', [referralCode]);
         if (referrers.length > 0) {
           validReferrer = referrers[0];
-          if (joiningBonusCoins > 0) {
-            initialBalance = joiningBonusCoins;
-          }
         }
       }
+
+      const initialBalance = welcomeBonusCoins;
 
       await db.execute(
         `INSERT INTO users (telegram_user_id, name, username, balance, referral_code, referred_by, status) 
@@ -83,25 +99,25 @@ async function handleAuth(req, res) {
       const newUsers = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [tgIdStr]);
       user = newUsers[0];
 
+      // If joined with referral code, record pending referral for inviter
       if (validReferrer) {
-        // Record pending referral for the inviter
         await db.execute(
           `INSERT INTO referrals (referrer_user_id, referred_user_id, referral_code, status, reward_amount)
            VALUES (?, ?, ?, 'PENDING', ?)`,
           [validReferrer.id, user.id, referralCode, referrerBonusCoins]
         );
+      }
 
-        // Record Welcome Joining Bonus transaction for the new user
-        if (joiningBonusCoins > 0) {
-          await db.execute(
-            `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
-             VALUES (?, 'WELCOME_BONUS', ?, ?, ?)`,
-            [user.id, joiningBonusCoins, `JOIN_REF_${validReferrer.id}`, `Instant Joining Bonus for using invite code ${referralCode}`]
-          );
+      // Record Welcome Bonus transaction
+      if (welcomeBonusCoins > 0) {
+        await db.execute(
+          `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
+           VALUES (?, 'WELCOME_BONUS', ?, ?, ?)`,
+          [user.id, welcomeBonusCoins, validReferrer ? `JOIN_REF_${validReferrer.id}` : 'WELCOME_DIRECT', validReferrer ? `Instant Welcome Bonus for using invite code ${referralCode}` : 'Welcome Bonus for joining Survey King']
+        );
 
-          console.log(`🎁 Instant Joining Bonus of +${joiningBonusCoins} Coins credited to new user ${user.name} (#${user.telegram_user_id})!`);
-          notifyReferralReward(user.telegram_user_id, joiningBonusCoins, initialBalance, 'Welcome Joining Bonus');
-        }
+        console.log(`🎁 Instant Welcome Bonus of +${welcomeBonusCoins} Coins credited to new user ${user.name} (#${user.telegram_user_id})!`);
+        notifyReferralReward(user.telegram_user_id, welcomeBonusCoins, initialBalance, 'Welcome Bonus');
       }
     }
 

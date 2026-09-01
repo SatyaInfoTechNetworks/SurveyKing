@@ -52,6 +52,11 @@ function initBot() {
       console.log(`====================================================`);
 
       try {
+        const settingsRows = await db.query('SELECT * FROM platform_settings WHERE id = 1');
+        const refSettings = settingsRows[0] || { referrer_reward_coins: 1000, referee_reward_coins: 500, referral_trigger: 'FIRST_SURVEY' };
+        const welcomeBonusCoins = parseFloat(refSettings.referee_reward_coins || 500);
+        const referrerBonusCoins = parseFloat(refSettings.referrer_reward_coins || 1000);
+
         let users = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [tgUserId]);
         let user;
 
@@ -59,8 +64,8 @@ function initBot() {
           let myRefCode = 'SK' + Math.floor(10000 + Math.random() * 90000);
           await db.execute(
             `INSERT INTO users (telegram_user_id, name, username, balance, referral_code, referred_by, status) 
-             VALUES (?, ?, ?, 0.00, ?, ?, 'ACTIVE')`,
-            [tgUserId, name, username, myRefCode, refCode || null]
+             VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE')`,
+            [tgUserId, name, username, welcomeBonusCoins, myRefCode, refCode || null]
           );
           users = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [tgUserId]);
           user = users[0];
@@ -70,13 +75,37 @@ function initBot() {
             if (referrers.length > 0) {
               await db.execute(
                 `INSERT INTO referrals (referrer_user_id, referred_user_id, referral_code, status, reward_amount)
-                 VALUES (?, ?, ?, 'PENDING', 1000.00)`,
-                [referrers[0].id, user.id, refCode]
+                 VALUES (?, ?, ?, 'PENDING', ?)`,
+                [referrers[0].id, user.id, refCode, referrerBonusCoins]
               );
             }
           }
+
+          if (welcomeBonusCoins > 0) {
+            await db.execute(
+              `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
+               VALUES (?, 'WELCOME_BONUS', ?, ?, ?)`,
+              [user.id, welcomeBonusCoins, refCode ? `JOIN_REF_${refCode}` : 'WELCOME_DIRECT', 'Welcome Bonus for joining Survey King']
+            );
+          }
         } else {
           user = users[0];
+          // Check if existing user is missing their Welcome Bonus
+          const existingBonus = await db.query(
+            "SELECT id FROM wallet_transactions WHERE user_id = ? AND type IN ('WELCOME_BONUS', 'REFERRAL_WELCOME_BONUS')",
+            [user.id]
+          );
+          if (existingBonus.length === 0 && welcomeBonusCoins > 0) {
+            const currentBal = parseFloat(user.balance || 0);
+            const newBal = currentBal + welcomeBonusCoins;
+            await db.execute('UPDATE users SET balance = ? WHERE id = ?', [newBal, user.id]);
+            await db.execute(
+              `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
+               VALUES (?, 'WELCOME_BONUS', ?, 'WELCOME_NEW_USER', 'Welcome Bonus for joining Survey King')`,
+              [user.id, welcomeBonusCoins]
+            );
+            user.balance = newBal;
+          }
         }
 
         const balCoins = parseFloat(user.balance || 0);
