@@ -17,13 +17,18 @@ async function initDB() {
   console.log(`====================================================`);
 
   const hostsToTry = [
-    '72.61.254.236',
     process.env.MYSQL_HOST,
     'databases-masterdb-ilm2d7',
+    '72.61.254.236',
     'localhost'
   ].filter(Boolean);
 
-  const portsToTry = [3314, 3306, envPort];
+  const portsToTry = [
+    parseInt(process.env.MYSQL_PORT || '3306', 10),
+    3306,
+    3314
+  ];
+
   const usersToTry = [
     { u: 'yellapusatyasai@gmail.com', p: '@SaiDivya2503' },
     { u: envUser, p: envPass },
@@ -46,21 +51,6 @@ async function initDB() {
         for (const cred of usersToTry) {
           console.log(`🔄 Attempting MySQL connection -> Host: ${h}:${prt} | User: ${cred.u} | DB: ${dbName}...`);
           try {
-            // Attempt CREATE DATABASE IF NOT EXISTS dbName
-            try {
-              const rootConn = await mysql.createConnection({
-                host: h,
-                port: prt,
-                user: cred.u,
-                password: cred.p,
-                connectTimeout: 2000
-              });
-              await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\`;`);
-              await rootConn.end();
-            } catch (createDbErr) {
-              // Ignore privilege error if DB already exists
-            }
-
             const testPool = mysql.createPool({
               host: h,
               port: prt,
@@ -69,7 +59,7 @@ async function initDB() {
               database: dbName,
               waitForConnections: true,
               connectionLimit: 10,
-              connectTimeout: 3000
+              connectTimeout: 1200
             });
 
             const conn = await testPool.getConnection();
