@@ -1,5 +1,5 @@
 const db = require('../config/db');
-const { notifySurveyReward, notifyReferralReward } = require('../bot/telegramBot');
+const { notifySurveyReward, notifySurveyReversal, notifyReferralReward } = require('../bot/telegramBot');
 
 async function handleWebhook(req, res) {
   const startTime = Date.now();
@@ -8,7 +8,9 @@ async function handleWebhook(req, res) {
   // Map CPX Research parameters (Full names and ultra-short names)
   const transId = req.query.t || req.query.trans_id || req.body.t || req.body.trans_id || req.query.participationId || req.body.participationId;
   const rawStatus = String(req.query.s || req.query.status || req.body.s || req.body.status || '1').trim();
-  const statusParam = (rawStatus === '1' || rawStatus.toUpperCase() === 'COMPLETED') ? 'COMPLETED' : 'CANCELED';
+  const isReversal = (rawStatus === '2' || rawStatus.toUpperCase() === 'CANCELED' || rawStatus.toUpperCase() === 'REVERSED');
+  const statusParam = isReversal ? 'CANCELED' : 'COMPLETED';
+
   const tgUserId = (req.query.u || req.query.user_id || req.body.u || req.body.user_id || req.query.ext_user_id || req.body.ext_user_id || '').toString().trim();
   const offerId = req.query.o || req.query.offer_id || req.body.o || req.body.offer_id || 'CPX_OFFER';
   const amountLocal = parseFloat(req.query.a || req.query.amount_local || req.body.a || req.body.amount_local || 0);
@@ -20,7 +22,7 @@ async function handleWebhook(req, res) {
   console.log(`====================================================`);
   console.log(`🎯 [CPX POSTBACK WEBHOOK] Timestamp: ${new Date().toISOString()}`);
   console.log(`📡 Provider: ${provider.toUpperCase()} | Trans ID: ${transId || 'N/A'}`);
-  console.log(`👤 User ID: ${tgUserId || 'N/A'} | Status: ${statusParam} (${rawStatus}) | Reward: ${amountLocal} Coins`);
+  console.log(`👤 User ID: ${tgUserId || 'N/A'} | Status: ${isReversal ? 'REVERSAL (status=2)' : 'COMPLETED (status=1)'} | Reward: ${amountLocal} Coins`);
   console.log(`🌐 IP: ${clientIp}`);
   console.log(`====================================================`);
 
@@ -49,38 +51,11 @@ async function handleWebhook(req, res) {
       }
     }
 
-    // 2. If participation record exists
+    // 2. Lookup user from participation or from tgUserId
     if (participation) {
-      // Idempotency check: if already completed, don't double credit
-      if (participation.status === 'COMPLETED') {
-        idempotencyStatus = 'DUPLICATE';
-        console.log(`⚠️ Participation ${transId} is ALREADY rewarded. Duplicate postback safely ignored.`);
-        await logPostback({ provider, transId, tgUserId: participation.user_id, offerId, statusParam, rawStatus, amountLocal, amountUsd, clientIp, idempotencyStatus: 'DUPLICATE', errorReason: 'Already rewarded (Duplicate)', walletCredited: 0, startTime });
-        return res.status(200).send('OK');
-      }
-
-      if (statusParam !== 'COMPLETED') {
-        await db.execute(
-          `UPDATE survey_participations SET status = ? WHERE id = ?`,
-          [statusParam, participation.id]
-        );
-        await logPostback({ provider, transId, tgUserId: participation.user_id, offerId, statusParam, rawStatus, amountLocal, amountUsd, clientIp, idempotencyStatus: 'PROCESSED_CANCELED', errorReason: 'Survey Canceled / Screenout', walletCredited: 0, startTime });
-        return res.status(200).send('OK');
-      }
-
-      await db.execute(
-        `UPDATE survey_participations SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        [participation.id]
-      );
-
       const users = await db.query(`SELECT * FROM users WHERE id = ?`, [participation.user_id]);
-      if (users.length > 0) {
-        user = users[0];
-      }
-    }
-
-    // 3. If user not found from participation, lookup by Telegram User ID
-    if (!user && tgUserId) {
+      if (users.length > 0) user = users[0];
+    } else if (tgUserId) {
       const users = await db.query(`SELECT * FROM users WHERE telegram_user_id = ?`, [String(tgUserId)]);
       if (users.length > 0) {
         user = users[0];
@@ -94,9 +69,7 @@ async function handleWebhook(req, res) {
             [String(tgUserId), userRefCode]
           );
           const createdUsers = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [String(tgUserId)]);
-          if (createdUsers.length > 0) {
-            user = createdUsers[0];
-          }
+          if (createdUsers.length > 0) user = createdUsers[0];
         } catch (insertErr) {
           const existingUsers = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [String(tgUserId)]);
           if (existingUsers.length > 0) user = existingUsers[0];
@@ -104,20 +77,87 @@ async function handleWebhook(req, res) {
       }
     }
 
-    // 4. Fallback if user still cannot be resolved
+    // Fallback if user still cannot be found (e.g. test validator)
     if (!user) {
       console.log(`ℹ️ Test postback received without matching DB user: ${tgUserId || 'N/A'}`);
       await logPostback({ provider, transId, tgUserId, offerId, statusParam, rawStatus, amountLocal, amountUsd, clientIp, idempotencyStatus: 'TEST_SUCCESS', errorReason: null, walletCredited: 0, startTime });
       return res.status(200).send('OK');
     }
 
-    // 5. Handle cancellation / reversal postback
-    if (statusParam !== 'COMPLETED') {
-      await logPostback({ provider, transId, tgUserId: user.telegram_user_id, offerId, statusParam, rawStatus, amountLocal, amountUsd, clientIp, idempotencyStatus: 'CANCELED', errorReason: null, walletCredited: 0, startTime });
-      return res.status(200).send('OK');
+    // ---------------------------------------------------------------
+    // 3. REVERSAL / CHARGEBACK HANDLING (status=2)
+    // ---------------------------------------------------------------
+    if (isReversal) {
+      console.log(`🔄 [CHARGEBACK / REVERSAL] Processing status=2 reversal for Trans ID: ${transId}...`);
+
+      const deductionAmt = amountLocal > 0 ? amountLocal : parseFloat(participation?.reward || 500);
+
+      if (participation && participation.status === 'COMPLETED') {
+        // Reverse previously credited coins
+        const currentBal = parseFloat(user.balance || 0);
+        const newBal = Math.max(0, currentBal - deductionAmt);
+
+        await db.execute(`UPDATE users SET balance = ? WHERE id = ?`, [newBal, user.id]);
+
+        await db.execute(
+          `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
+           VALUES (?, 'SURVEY_REVERSAL', ?, ?, ?)`,
+          [user.id, -deductionAmt, transId || 'CPX_REVERSAL', `CPX Survey Chargeback / Reversal (Trans #${transId})`]
+        );
+
+        await db.execute(
+          `UPDATE survey_participations SET status = 'REVERSED' WHERE id = ?`,
+          [participation.id]
+        );
+
+        console.log(`📉 Reversal Complete: Deducted ${deductionAmt} Coins from User ${user.name}. New Balance: ${newBal} Coins`);
+
+        // Notify user via Telegram about reversal
+        notifySurveyReversal(user.telegram_user_id, 'CPX Research Survey', deductionAmt, newBal, 'Canceled / Reversed by Partner');
+
+        await logPostback({ provider, transId, tgUserId: user.telegram_user_id, offerId, statusParam: 'REVERSED', rawStatus, amountLocal: deductionAmt, amountUsd, clientIp, idempotencyStatus: 'REVERSED', errorReason: 'Chargeback Executed', walletCredited: 0, startTime });
+        return res.status(200).send('OK');
+      } else if (participation && participation.status === 'REVERSED') {
+        console.log(`⚠️ Transaction ${transId} was ALREADY reversed. Duplicate reversal safely ignored.`);
+        await logPostback({ provider, transId, tgUserId: user.telegram_user_id, offerId, statusParam: 'REVERSED', rawStatus, amountLocal: deductionAmt, amountUsd, clientIp, idempotencyStatus: 'DUPLICATE_REVERSAL', errorReason: 'Already reversed', walletCredited: 0, startTime });
+        return res.status(200).send('OK');
+      } else {
+        // Screenout or cancellation before completion
+        if (participation) {
+          await db.execute(`UPDATE survey_participations SET status = 'CANCELED' WHERE id = ?`, [participation.id]);
+        }
+        await logPostback({ provider, transId, tgUserId: user.telegram_user_id, offerId, statusParam: 'CANCELED', rawStatus, amountLocal: deductionAmt, amountUsd, clientIp, idempotencyStatus: 'CANCELED_OK', errorReason: null, walletCredited: 0, startTime });
+        return res.status(200).send('OK');
+      }
     }
 
-    // 6. Credit Coins to User
+    // ---------------------------------------------------------------
+    // 4. SURVEY COMPLETION HANDLING (status=1)
+    // ---------------------------------------------------------------
+    if (participation) {
+      // Idempotency check: if already completed, don't double credit
+      if (participation.status === 'COMPLETED') {
+        idempotencyStatus = 'DUPLICATE';
+        console.log(`⚠️ Participation ${transId} is ALREADY rewarded. Duplicate completion postback safely ignored.`);
+        await logPostback({ provider, transId, tgUserId: participation.user_id, offerId, statusParam, rawStatus, amountLocal, amountUsd, clientIp, idempotencyStatus: 'DUPLICATE', errorReason: 'Already rewarded (Duplicate)', walletCredited: 0, startTime });
+        return res.status(200).send('OK');
+      }
+
+      await db.execute(
+        `UPDATE survey_participations SET status = 'COMPLETED', completed_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [participation.id]
+      );
+    } else {
+      // Auto-create completed participation record
+      const newPartId = transId || `CPX_${Date.now()}`;
+      await db.execute(
+        `INSERT INTO survey_participations (participation_id, user_id, survey_id, provider, status, reward, completed_at)
+         VALUES (?, ?, 'CPX_SURVEY', 'CPX', 'COMPLETED', ?, CURRENT_TIMESTAMP)`,
+        [newPartId, user.id, amountLocal > 0 ? amountLocal : 500.00]
+      );
+    }
+
+    // Credit Coins to User
     const rewardAmt = amountLocal > 0 ? amountLocal : parseFloat(participation?.reward || 500);
     const oldBalance = parseFloat(user.balance || 0);
     const newBalance = oldBalance + rewardAmt;
@@ -136,7 +176,7 @@ async function handleWebhook(req, res) {
     // Send Live Telegram Notification for Survey Completion
     notifySurveyReward(user.telegram_user_id, 'CPX Research Survey', rewardAmt, newBalance);
 
-    // 7. Check Referral Qualifications
+    // Check Referral Qualifications
     const settingsRows = await db.query('SELECT * FROM platform_settings WHERE id = 1');
     const refSettings = settingsRows[0] || { referrer_reward_coins: 1000, referee_reward_coins: 500, referral_trigger: 'FIRST_SURVEY', min_survey_reward_coins: 100 };
     const minSurveyReward = parseFloat(refSettings.min_survey_reward_coins || 100);

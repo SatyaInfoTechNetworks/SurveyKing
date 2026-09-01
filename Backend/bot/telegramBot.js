@@ -232,6 +232,30 @@ async function notifyReferralReward(telegramUserId, rewardCoins, newBalanceCoins
 }
 
 /**
+ * Notify user on Telegram when Survey Reward is Reversed / Chargebacked
+ */
+async function notifySurveyReversal(telegramUserId, surveyTitle, deductedCoins, newBalanceCoins, reason = 'Survey Partner Reversal') {
+  if (!bot || !telegramUserId) return;
+  const rupees = (deductedCoins / 100).toFixed(2);
+  const newRupees = (newBalanceCoins / 100).toFixed(2);
+
+  const message = `⚠️ *SURVEY REWARD REVERSED*\n\n` +
+    `🎯 *Survey:* ${surveyTitle || 'Survey'}\n` +
+    `🪙 *Deduction:* -${deductedCoins.toLocaleString()} Coins (≈ ₹${rupees} INR)\n` +
+    `ℹ️ *Reason:* ${reason || 'Canceled by Partner'}\n\n` +
+    `💰 *Updated Balance:* ${newBalanceCoins.toLocaleString()} Coins (≈ ₹${newRupees} INR)\n\n` +
+    `Please answer carefully and attentively to avoid partner quality reversals.`;
+
+  try {
+    await bot.sendMessage(telegramUserId, message, { parse_mode: 'Markdown' });
+    await recordNotificationLog(telegramUserId, 'SURVEY_REVERSAL', message, 'SENT', null);
+    console.log(`📲 Telegram Reversal Alert Sent to User ${telegramUserId} (-${deductedCoins} Coins)`);
+  } catch (err) {
+    await recordNotificationLog(telegramUserId, 'SURVEY_REVERSAL', message, 'FAILED', err.message);
+  }
+}
+
+/**
  * Notify user on Telegram when Withdrawal Request is Approved
  */
 async function notifyWithdrawalApproved(telegramUserId, amountRupees, upiId, method = 'UPI') {
@@ -299,6 +323,7 @@ async function sendBroadcast(telegramUserId, text) {
 module.exports = {
   initBot,
   notifySurveyReward,
+  notifySurveyReversal,
   notifyReferralReward,
   notifyWithdrawalApproved,
   notifyWithdrawalRejected,
