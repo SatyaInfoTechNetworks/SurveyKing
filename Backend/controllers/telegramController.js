@@ -520,9 +520,12 @@ async function requestWithdrawal(req, res) {
       return res.status(400).json({ error: 'telegramUserId, amount, and withdrawal details are required' });
     }
 
+    const settingsRows = await db.query('SELECT min_withdrawal_coins FROM platform_settings WHERE id = 1');
+    const minThreshold = parseFloat(settingsRows[0]?.min_withdrawal_coins || 2500);
+
     const withdrawAmt = parseFloat(amount);
-    if (isNaN(withdrawAmt) || withdrawAmt < 2500) {
-      return res.status(400).json({ error: 'Minimum withdrawal tier is 2,500 Coins (₹5.00)' });
+    if (isNaN(withdrawAmt) || withdrawAmt < minThreshold) {
+      return res.status(400).json({ error: `Minimum withdrawal tier is ${minThreshold.toLocaleString()} Coins (₹${(minThreshold / 100).toFixed(2)})` });
     }
 
     const users = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [String(telegramUserId)]);

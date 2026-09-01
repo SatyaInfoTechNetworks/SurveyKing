@@ -23,10 +23,11 @@ export default function SettingsPage({
     { coins: 10000, rupees: 20 }
   ]);
 
-  // Referral Settings State
+  // Referral & Platform Settings State
   const [refereeCoins, setRefereeCoins] = useState(settings?.referralSettings?.referee_reward_coins || 500);
   const [referrerCoins, setReferrerCoins] = useState(settings?.referralSettings?.referrer_reward_coins || 1000);
   const [minSurveyCoins, setMinSurveyCoins] = useState(settings?.referralSettings?.min_survey_reward_coins || 100);
+  const [minWithdrawalCoins, setMinWithdrawalCoins] = useState(settings?.referralSettings?.min_withdrawal_coins || settings?.general?.minWithdrawalCoins || 2500);
   const [trigger, setTrigger] = useState(settings?.referralSettings?.referral_trigger || 'FIRST_SURVEY');
 
   const copyPostback = () => {
@@ -87,6 +88,7 @@ export default function SettingsPage({
       refereeRewardCoins: parseInt(refereeCoins, 10),
       referrerRewardCoins: parseInt(referrerCoins, 10),
       minSurveyRewardCoins: parseInt(minSurveyCoins, 10),
+      minWithdrawalCoins: parseInt(minWithdrawalCoins, 10),
       referralTrigger: trigger
     });
   };
@@ -99,7 +101,7 @@ export default function SettingsPage({
           ⚙️ Global Platform & Integrations Configuration
         </h1>
         <p style={{ fontSize: '0.82rem', color: 'var(--text-muted, #94a3b8)', margin: '4px 0 0 0' }}>
-          Manage global economy rates, payout gateways, custom reward tiers, joining bonuses, and CPX webhook configuration.
+          Manage global economy rates, minimum withdrawal limits, payout gateways, custom reward tiers, joining bonuses, and CPX webhook configuration.
         </p>
       </div>
 
@@ -129,9 +131,9 @@ export default function SettingsPage({
             </div>
 
             <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)', padding: '12px', borderRadius: '8px' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748b)' }}>Minimum Withdrawal Threshold</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748b)' }}>Active Min Withdrawal Limit</div>
               <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#10b981', marginTop: '2px' }}>
-                2,500 Coins (₹5.00 INR)
+                {parseInt(minWithdrawalCoins, 10).toLocaleString()} Coins (₹{(parseInt(minWithdrawalCoins, 10) / 100).toFixed(2)} INR)
               </div>
             </div>
           </div>
@@ -216,7 +218,7 @@ export default function SettingsPage({
           <span style={{ fontSize: '1rem', fontWeight: 800, color: '#fff' }}>Referral Joining Bonus & Qualification Settings</span>
         </div>
 
-        <form onSubmit={handleSaveReferral} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', alignItems: 'flex-end' }}>
+        <form onSubmit={handleSaveReferral} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', alignItems: 'flex-end' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted, #64748b)', marginBottom: '4px' }}>
               Friend Instant Joining Bonus (Coins) *
@@ -292,6 +294,31 @@ export default function SettingsPage({
           </div>
 
           <div>
+            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted, #64748b)', marginBottom: '4px' }}>
+              Min Withdrawal Limit (Coins) *
+            </label>
+            <input
+              type="number"
+              value={minWithdrawalCoins}
+              onChange={(e) => setMinWithdrawalCoins(e.target.value)}
+              placeholder="2500"
+              style={{
+                width: '100%',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '8px',
+                padding: '9px 12px',
+                color: '#10b981',
+                fontWeight: 800,
+                fontSize: '0.85rem'
+              }}
+            />
+            <div style={{ fontSize: '0.7rem', color: '#10b981', marginTop: '2px' }}>
+              Global minimum coins to withdraw (≈ ₹{(minWithdrawalCoins / 100).toFixed(2)})
+            </div>
+          </div>
+
+          <div>
             <button
               type="submit"
               disabled={savingReferral}
@@ -312,7 +339,7 @@ export default function SettingsPage({
               }}
             >
               <Save size={15} />
-              <span>{savingReferral ? 'Saving...' : 'Save Referral Rules'}</span>
+              <span>{savingReferral ? 'Saving...' : 'Save Platform Rules'}</span>
             </button>
           </div>
         </form>

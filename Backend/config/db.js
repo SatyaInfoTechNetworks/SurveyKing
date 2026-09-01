@@ -194,11 +194,13 @@ async function createTables() {
       referee_reward_coins INT DEFAULT 500,
       referral_trigger VARCHAR(50) DEFAULT 'FIRST_SURVEY',
       min_survey_reward_coins INT DEFAULT 100,
+      min_withdrawal_coins INT DEFAULT 2500,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB;
   `);
 
   try { await mysqlPool.execute(`ALTER TABLE platform_settings ADD COLUMN min_survey_reward_coins INT DEFAULT 100;`); } catch (e) {}
+  try { await mysqlPool.execute(`ALTER TABLE platform_settings ADD COLUMN min_withdrawal_coins INT DEFAULT 2500;`); } catch (e) {}
 
   // Check if payout_methods has method_id column, recreate if outdated
   try {

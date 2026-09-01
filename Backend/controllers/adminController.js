@@ -945,24 +945,30 @@ async function getReferralSettings(req, res) {
 
 async function updateReferralSettings(req, res) {
   try {
-    const { referrerRewardCoins, refereeRewardCoins, referralTrigger, minSurveyRewardCoins } = req.body;
+    const { referrerRewardCoins, refereeRewardCoins, referralTrigger, minSurveyRewardCoins, minWithdrawalCoins } = req.body;
 
-    await db.execute(
-      `UPDATE platform_settings SET referrer_reward_coins = ?, referee_reward_coins = ?, referral_trigger = ?, min_survey_reward_coins = ? WHERE id = 1`,
-      [referrerRewardCoins || 1000, refereeRewardCoins || 500, referralTrigger || 'FIRST_SURVEY', minSurveyRewardCoins || 100]
-    );
+    let sql = `UPDATE platform_settings SET referrer_reward_coins = ?, referee_reward_coins = ?, referral_trigger = ?, min_survey_reward_coins = ?`;
+    let params = [referrerRewardCoins || 1000, refereeRewardCoins || 500, referralTrigger || 'FIRST_SURVEY', minSurveyRewardCoins || 100];
+
+    if (minWithdrawalCoins !== undefined) {
+      sql += `, min_withdrawal_coins = ?`;
+      params.push(parseInt(minWithdrawalCoins, 10));
+    }
+
+    sql += ` WHERE id = 1`;
+    await db.execute(sql, params);
 
     await recordAuditLog({
       adminUsername: req.adminUser || 'admin',
       action: 'UPDATE_REFERRAL_RULES',
       targetType: 'PLATFORM_SETTINGS',
       targetId: '1',
-      newValue: JSON.stringify({ referrerRewardCoins, refereeRewardCoins, referralTrigger, minSurveyRewardCoins }),
-      reason: 'Updated Referral Engine Rules',
+      newValue: JSON.stringify({ referrerRewardCoins, refereeRewardCoins, referralTrigger, minSurveyRewardCoins, minWithdrawalCoins }),
+      reason: 'Updated Platform & Referral Engine Rules',
       ip: req.clientIp || '127.0.0.1'
     });
 
-    return res.json({ success: true, message: 'Referral rules updated successfully!' });
+    return res.json({ success: true, message: 'Platform rules updated successfully!' });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to update referral settings' });
   }
@@ -1144,13 +1150,15 @@ async function getSettings(req, res) {
     const refRows = await db.query('SELECT * FROM platform_settings WHERE id = 1');
     const methods = await db.query('SELECT * FROM payout_methods ORDER BY id ASC');
 
+    const minW = parseInt(refRows[0]?.min_withdrawal_coins || 2500, 10);
+
     return res.json({
       success: true,
       general: {
         platformName: 'Survey King 👑',
-        coinRate: '1,000 Coins = ₹10.00 INR',
-        minWithdrawalCoins: 2500,
-        minWithdrawalRupees: 5.00
+        coinRate: '1,000 Coins = ₹10.00 INR (100 Coins = ₹1.00)',
+        minWithdrawalCoins: minW,
+        minWithdrawalRupees: (minW / 100).toFixed(2)
       },
       referralSettings: refRows[0],
       payoutMethods: methods.map(m => ({
