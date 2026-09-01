@@ -306,9 +306,7 @@ async function getSurveys(req, res) {
         const twData = await twRes.json();
         if (twData && twData.success && Array.isArray(twData.surveys) && twData.surveys.length > 0) {
           liveTimeWallSurveys = twData.surveys.map(s => {
-            const coinAmount = parseFloat(s.currency_amount || 0) > 0 
-              ? parseFloat(s.currency_amount) 
-              : Math.round(parseFloat(s.usd_rate || 0.50) * 4500);
+            const coinAmount = parseInt(s.currency_amount || 0, 10);
 
             return {
               id: `tw_${s.id}`,

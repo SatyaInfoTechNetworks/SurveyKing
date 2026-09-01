@@ -274,8 +274,8 @@ async function handleTimeWallWebhook(req, res) {
   const revenueUsd = parseFloat(rawRevenue) || 0;
   
   const rawCurrency = req.query.currency || req.query.currencyAmount || req.body.currency || req.body.currencyAmount;
-  // If currency amount is passed in query, use it; otherwise compute from revenueUsd ($1.00 = 4,500 Coins)
-  let coinAmount = rawCurrency ? Math.abs(parseFloat(rawCurrency)) : Math.round(Math.abs(revenueUsd) * 4500);
+  // Use exact currencyAmount (coins) sent by TimeWall directly without math multipliers
+  let coinAmount = parseInt(rawCurrency || 0, 10);
 
   const incomingHash = req.query.hash || req.body.hash;
   const rawType = (req.query.type || req.body.type || 'credit').toLowerCase();

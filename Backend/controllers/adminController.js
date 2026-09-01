@@ -474,7 +474,7 @@ async function getLiveSurveys(req, res) {
             provider: 'TimeWall',
             surveyId: String(s.id).substring(0, 10),
             title: `TimeWall Survey #${String(s.id).substring(0, 8)}`,
-            reward: parseFloat(s.currency_amount || 0) > 0 ? parseFloat(s.currency_amount) : Math.round(parseFloat(s.usd_rate || 0.50) * 4500),
+            reward: parseInt(s.currency_amount || 0, 10),
             loi: parseInt(s.loi || 10, 10),
             category: 'Market Research',
             status: 'LIVE',
