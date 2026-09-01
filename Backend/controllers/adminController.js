@@ -322,6 +322,118 @@ async function deleteSurvey(req, res) {
   }
 }
 
+// GET /api/admin/referral-settings
+async function getReferralSettings(req, res) {
+  try {
+    const rows = await db.query('SELECT * FROM platform_settings WHERE id = 1');
+    const settings = rows[0] || { referrer_reward_coins: 1000, referee_reward_coins: 500, referral_trigger: 'FIRST_SURVEY' };
+    return res.json({
+      success: true,
+      settings: {
+        referrerRewardCoins: settings.referrer_reward_coins,
+        refereeRewardCoins: settings.referee_reward_coins,
+        referralTrigger: settings.referral_trigger
+      }
+    });
+  } catch (err) {
+    console.error('Error in getReferralSettings:', err);
+    return res.status(500).json({ error: 'Failed to fetch referral settings' });
+  }
+}
+
+// PUT /api/admin/referral-settings
+async function updateReferralSettings(req, res) {
+  try {
+    const { referrerRewardCoins, refereeRewardCoins, referralTrigger } = req.body;
+
+    await db.execute(
+      `UPDATE platform_settings SET referrer_reward_coins = ?, referee_reward_coins = ?, referral_trigger = ? WHERE id = 1`,
+      [parseInt(referrerRewardCoins || 1000, 10), parseInt(refereeRewardCoins || 500, 10), referralTrigger || 'FIRST_SURVEY']
+    );
+
+    return res.json({
+      success: true,
+      message: 'Referral rules updated successfully!'
+    });
+  } catch (err) {
+    console.error('Error in updateReferralSettings:', err);
+    return res.status(500).json({ error: 'Failed to update referral settings' });
+  }
+}
+
+// GET /api/admin/payout-methods
+async function getPayoutMethods(req, res) {
+  try {
+    const rows = await db.query('SELECT * FROM payout_methods ORDER BY id ASC');
+    const formatted = rows.map(m => ({
+      id: m.id,
+      methodId: m.method_id,
+      name: m.name,
+      icon: m.icon,
+      placeholder: m.placeholder,
+      tiers: JSON.parse(m.tiers_json || '[]'),
+      active: Boolean(m.active)
+    }));
+
+    return res.json({ success: true, payoutMethods: formatted });
+  } catch (err) {
+    console.error('Error in getPayoutMethods:', err);
+    return res.status(500).json({ error: 'Failed to fetch payout methods' });
+  }
+}
+
+// POST /api/admin/payout-methods
+async function createPayoutMethod(req, res) {
+  try {
+    const { methodId, name, icon, placeholder, tiers } = req.body;
+
+    if (!methodId || !name) {
+      return res.status(400).json({ error: 'methodId and name are required' });
+    }
+
+    const tiersJson = JSON.stringify(tiers || [
+      { coins: 2500, rupees: 5 },
+      { coins: 5000, rupees: 10 },
+      { coins: 10000, rupees: 20 },
+      { coins: 25000, rupees: 50 }
+    ]);
+
+    await db.execute(
+      `INSERT INTO payout_methods (method_id, name, icon, placeholder, tiers_json, active) VALUES (?, ?, ?, ?, ?, 1)`,
+      [methodId.toUpperCase(), name, icon || '💳', placeholder || 'Enter Details', tiersJson]
+    );
+
+    return res.json({ success: true, message: `Payout method '${name}' created successfully!` });
+  } catch (err) {
+    console.error('Error in createPayoutMethod:', err);
+    return res.status(500).json({ error: 'Failed to create payout method' });
+  }
+}
+
+// PUT /api/admin/payout-methods/:id
+async function updatePayoutMethod(req, res) {
+  try {
+    const id = req.params.id;
+    const { active, name, tiers, placeholder } = req.body;
+
+    const rows = await db.query('SELECT * FROM payout_methods WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Payout method not found' });
+    const m = rows[0];
+
+    const tiersJson = tiers ? JSON.stringify(tiers) : m.tiers_json;
+
+    await db.execute(
+      `UPDATE payout_methods SET active = ?, name = ?, tiers_json = ?, placeholder = ? WHERE id = ?`,
+      [active !== undefined ? (active ? 1 : 0) : m.active, name || m.name, tiersJson, placeholder || m.placeholder, m.id]
+    );
+
+    return res.json({ success: true, message: 'Payout method updated successfully' });
+  } catch (err) {
+    console.error('Error in updatePayoutMethod:', err);
+    return res.status(500).json({ error: 'Failed to update payout method' });
+  }
+}
+
 module.exports = {
   getStats,
   getUsers,
@@ -331,5 +443,10 @@ module.exports = {
   processWithdrawal,
   createSurvey,
   updateSurvey,
-  deleteSurvey
+  deleteSurvey,
+  getReferralSettings,
+  updateReferralSettings,
+  getPayoutMethods,
+  createPayoutMethod,
+  updatePayoutMethod
 };

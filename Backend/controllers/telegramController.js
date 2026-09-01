@@ -386,15 +386,15 @@ async function getReferrals(req, res) {
 // POST /api/telegram/withdraw
 async function requestWithdrawal(req, res) {
   try {
-    const { telegramUserId, amount, upiId } = req.body;
+    const { telegramUserId, amount, upiId, method } = req.body;
 
     if (!telegramUserId || !amount || !upiId) {
-      return res.status(400).json({ error: 'telegramUserId, amount, and upiId are required' });
+      return res.status(400).json({ error: 'telegramUserId, amount, and withdrawal details are required' });
     }
 
     const withdrawAmt = parseFloat(amount);
-    if (isNaN(withdrawAmt) || withdrawAmt < 5000) {
-      return res.status(400).json({ error: 'Minimum withdrawal amount is 5,000 Coins (₹50.00)' });
+    if (isNaN(withdrawAmt) || withdrawAmt < 2500) {
+      return res.status(400).json({ error: 'Minimum withdrawal tier is 2,500 Coins (₹5.00)' });
     }
 
     const users = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [String(telegramUserId)]);
@@ -409,29 +409,33 @@ async function requestWithdrawal(req, res) {
       return res.status(400).json({ error: `Insufficient coin balance. Current balance is ${currentBalance.toLocaleString()} Coins` });
     }
 
+    const payoutMethod = method || 'UPI';
     const newBalance = currentBalance - withdrawAmt;
-    const rupeeValue = (withdrawAmt / 100).toFixed(2);
+    const rupeeValue = (withdrawAmt / 500).toFixed(2); // Tier conversion or 500 Coins = ₹1 depending on rate or 1000 = ₹10
+    const inrAmount = (withdrawAmt / 100).toFixed(2);
+
     await db.execute('UPDATE users SET balance = ? WHERE id = ?', [newBalance, user.id]);
 
     const wResult = await db.execute(
-      `INSERT INTO withdrawals (user_id, amount, upi_id, status) VALUES (?, ?, ?, 'PENDING')`,
-      [user.id, withdrawAmt, upiId]
+      `INSERT INTO withdrawals (user_id, method, amount, upi_id, status) VALUES (?, ?, ?, ?, 'PENDING')`,
+      [user.id, payoutMethod, withdrawAmt, upiId]
     );
 
     await db.execute(
       `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
        VALUES (?, 'WITHDRAWAL', ?, ?, ?)`,
-      [user.id, -withdrawAmt, `WITHDRAW_${wResult.insertId}`, `UPI Withdrawal of ${withdrawAmt.toLocaleString()} Coins (₹${rupeeValue}) to ${upiId}`]
+      [user.id, -withdrawAmt, `WITHDRAW_${wResult.insertId}`, `${payoutMethod} Payout of ${withdrawAmt.toLocaleString()} Coins (₹${inrAmount}) to ${upiId}`]
     );
 
     return res.json({
       success: true,
-      message: `Withdrawal request of ${withdrawAmt.toLocaleString()} Coins (₹${rupeeValue}) submitted successfully!`,
+      message: `Withdrawal request of ${withdrawAmt.toLocaleString()} Coins (₹${inrAmount}) via ${payoutMethod} submitted successfully!`,
       newBalance,
       withdrawal: {
         id: wResult.insertId,
+        method: payoutMethod,
         amount: withdrawAmt,
-        rupeeValue,
+        rupeeValue: inrAmount,
         upiId,
         status: 'PENDING'
       }

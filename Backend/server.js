@@ -57,6 +57,11 @@ app.get('/api/admin/surveys', telegramController.getSurveys);
 app.post('/api/admin/surveys', adminController.createSurvey);
 app.put('/api/admin/surveys/:id', adminController.updateSurvey);
 app.delete('/api/admin/surveys/:id', adminController.deleteSurvey);
+app.get('/api/admin/referral-settings', adminController.getReferralSettings);
+app.put('/api/admin/referral-settings', adminController.updateReferralSettings);
+app.get('/api/admin/payout-methods', adminController.getPayoutMethods);
+app.post('/api/admin/payout-methods', adminController.createPayoutMethod);
+app.put('/api/admin/payout-methods/:id', adminController.updatePayoutMethod);
 
 // Start Server
 async function startServer() {

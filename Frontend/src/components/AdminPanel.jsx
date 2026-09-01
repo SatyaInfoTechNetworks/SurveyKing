@@ -1,52 +1,54 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Users, Wallet, Target, Check, X, Ban, Plus, RefreshCw, DollarSign, AlertTriangle } from 'lucide-react';
+import { Shield, Users, Wallet, Target, Plus, CheckCircle, XCircle, AlertCircle, RefreshCw, X, Edit, Trash, Settings, CreditCard, Gift, Save } from 'lucide-react';
 
-export default function AdminPanel({ onClose }) {
-  const [adminTab, setAdminTab] = useState('overview');
+export default function AdminPanel({ onClose, onRefreshData }) {
+  const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
-  const [userSearch, setUserSearch] = useState('');
   const [withdrawals, setWithdrawals] = useState([]);
   const [surveys, setSurveys] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  // New Survey Form State
-  const [showAddSurvey, setShowAddSurvey] = useState(false);
-  const [newSurvey, setNewSurvey] = useState({
-    title: '',
-    reward: '5000',
-    estimatedMinutes: '6',
-    provider: 'CPX Research',
-    category: 'General',
-    icon: '🎯'
+  const [payoutMethods, setPayoutMethods] = useState([]);
+  const [referralSettings, setReferralSettings] = useState({
+    referrerRewardCoins: 1000,
+    refereeRewardCoins: 500,
+    referralTrigger: 'FIRST_SURVEY'
   });
 
-  // Balance Adjust Modal State
-  const [adjustingUser, setAdjustingUser] = useState(null);
-  const [adjustAmount, setAdjustAmount] = useState('');
-  const [adjustReason, setAdjustReason] = useState('');
+  const [searchUser, setSearchUser] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [msg, setMsg] = useState(null);
 
-  const [notification, setNotification] = useState(null);
+  // New Survey Form State
+  const [showSurveyModal, setShowSurveyModal] = useState(false);
+  const [surveyId, setSurveyId] = useState('');
+  const [surveyTitle, setSurveyTitle] = useState('');
+  const [surveyReward, setSurveyReward] = useState('5000');
+  const [surveyMinutes, setSurveyMinutes] = useState('8');
+  const [surveyProvider, setSurveyProvider] = useState('CPX Research');
+  const [surveyCategory, setSurveyCategory] = useState('General');
+  const [surveyIcon, setSurveyIcon] = useState('🔥');
+
+  // Edit Balance Modal State
+  const [balanceModalUser, setBalanceModalUser] = useState(null);
+  const [coinAdjustment, setCoinAdjustment] = useState('');
+
+  // Referral Settings Form State
+  const [savingReferral, setSavingReferral] = useState(false);
 
   useEffect(() => {
     loadAdminData();
   }, []);
 
-  const notify = (msg, type = 'success') => {
-    setNotification({ msg, type });
-    setTimeout(() => setNotification(null), 3000);
-  };
-
   const loadAdminData = async () => {
     setLoading(true);
     try {
       // 1. Stats
-      const sRes = await fetch('/api/admin/stats');
-      const sData = await sRes.json();
-      if (sData.success) setStats(sData.stats);
+      const stRes = await fetch('/api/admin/stats');
+      const stData = await stRes.json();
+      if (stData.success) setStats(stData.stats);
 
       // 2. Users
-      const uRes = await fetch(`/api/admin/users?search=${encodeURIComponent(userSearch)}`);
+      const uRes = await fetch('/api/admin/users');
       const uData = await uRes.json();
       if (uData.success) setUsers(uData.users);
 
@@ -56,71 +58,69 @@ export default function AdminPanel({ onClose }) {
       if (wData.success) setWithdrawals(wData.withdrawals);
 
       // 4. Surveys
-      const svRes = await fetch('/api/admin/surveys');
-      const svData = await svRes.json();
-      if (svData.success) setSurveys(svData.surveys);
+      const sRes = await fetch('/api/admin/surveys');
+      const sData = await sRes.json();
+      if (sData.success) setSurveys(sData.surveys);
+
+      // 5. Payout Methods
+      const pmRes = await fetch('/api/admin/payout-methods');
+      const pmData = await pmRes.json();
+      if (pmData.success) setPayoutMethods(pmData.payoutMethods);
+
+      // 6. Referral Settings
+      const refRes = await fetch('/api/admin/referral-settings');
+      const refData = await refRes.json();
+      if (refData.success) setReferralSettings(refData.settings);
+
     } catch (err) {
-      console.error('Error loading admin data:', err);
+      console.error('Error loading admin dashboard data:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearchUsers = async (e) => {
-    e.preventDefault();
-    const res = await fetch(`/api/admin/users?search=${encodeURIComponent(userSearch)}`);
-    const data = await res.json();
-    if (data.success) setUsers(data.users);
-  };
-
-  // Toggle Ban / Unban
-  const handleToggleBan = async (user) => {
-    const newStatus = user.status === 'BANNED' ? 'ACTIVE' : 'BANNED';
+  const handleToggleUserStatus = async (userId, currentStatus) => {
+    const newStatus = currentStatus === 'ACTIVE' ? 'BANNED' : 'ACTIVE';
     try {
-      const res = await fetch(`/api/admin/users/${user.id}/status`, {
+      const res = await fetch(`/api/admin/users/${userId}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
       });
       const data = await res.json();
       if (data.success) {
-        notify(`User ${user.name} is now ${newStatus}`);
+        setMsg({ type: 'success', text: `User status changed to ${newStatus}` });
         loadAdminData();
+        if (onRefreshData) onRefreshData();
       }
     } catch (err) {
-      notify('Failed to update user status', 'error');
+      setMsg({ type: 'error', text: 'Failed to update user status' });
     }
   };
 
-  // Submit Balance Adjustment
-  const handleBalanceSubmit = async (e) => {
+  const handleAdjustBalance = async (e) => {
     e.preventDefault();
-    if (!adjustingUser || !adjustAmount) return;
-
+    if (!balanceModalUser || !coinAdjustment) return;
     try {
-      const res = await fetch(`/api/admin/users/${adjustingUser.id}/balance`, {
+      const res = await fetch(`/api/admin/users/${balanceModalUser.id}/balance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: adjustAmount,
-          description: adjustReason || 'Admin adjustment'
-        })
+        body: JSON.stringify({ amount: parseFloat(coinAdjustment), description: 'Admin Manual Coin Adjustment' })
       });
       const data = await res.json();
       if (data.success) {
-        notify(`Updated balance for ${adjustingUser.name}`);
-        setAdjustingUser(null);
-        setAdjustAmount('');
-        setAdjustReason('');
+        setMsg({ type: 'success', text: `Updated coin balance for ${balanceModalUser.name}` });
+        setBalanceModalUser(null);
+        setCoinAdjustment('');
         loadAdminData();
+        if (onRefreshData) onRefreshData();
       }
     } catch (err) {
-      notify('Failed to adjust balance', 'error');
+      setMsg({ type: 'error', text: 'Failed to adjust balance' });
     }
   };
 
-  // Approve / Reject Withdrawal
-  const handleWithdrawalAction = async (withdrawalId, action) => {
+  const handleProcessWithdrawal = async (withdrawalId, action) => {
     try {
       const res = await fetch(`/api/admin/withdrawals/${withdrawalId}/action`, {
         method: 'POST',
@@ -129,322 +129,260 @@ export default function AdminPanel({ onClose }) {
       });
       const data = await res.json();
       if (data.success) {
-        notify(data.message);
+        setMsg({ type: 'success', text: data.message });
         loadAdminData();
-      } else {
-        notify(data.error || 'Failed to process withdrawal', 'error');
+        if (onRefreshData) onRefreshData();
       }
     } catch (err) {
-      notify('Error processing request', 'error');
+      setMsg({ type: 'error', text: 'Failed to process withdrawal action' });
     }
   };
 
-  // Add New Survey
   const handleCreateSurvey = async (e) => {
     e.preventDefault();
     try {
       const res = await fetch('/api/admin/surveys', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newSurvey)
+        body: JSON.stringify({
+          surveyId,
+          title: surveyTitle,
+          reward: parseFloat(surveyReward),
+          estimatedMinutes: parseInt(surveyMinutes, 10),
+          provider: surveyProvider,
+          category: surveyCategory,
+          icon: surveyIcon
+        })
       });
       const data = await res.json();
       if (data.success) {
-        notify(data.message);
-        setShowAddSurvey(false);
-        setNewSurvey({ title: '', reward: '5000', estimatedMinutes: '6', provider: 'CPX Research', category: 'General', icon: '🎯' });
+        setMsg({ type: 'success', text: 'Custom survey created successfully!' });
+        setShowSurveyModal(false);
+        setSurveyId('');
+        setSurveyTitle('');
         loadAdminData();
+        if (onRefreshData) onRefreshData();
       }
     } catch (err) {
-      notify('Failed to create survey', 'error');
+      setMsg({ type: 'error', text: 'Failed to create survey' });
     }
   };
 
-  // Toggle Survey Active Status
-  const handleToggleSurvey = async (survey) => {
+  const handleSaveReferralSettings = async (e) => {
+    e.preventDefault();
+    setSavingReferral(true);
     try {
-      const res = await fetch(`/api/admin/surveys/${survey.id}`, {
+      const res = await fetch('/api/admin/referral-settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active: !survey.active })
+        body: JSON.stringify(referralSettings)
       });
       const data = await res.json();
       if (data.success) {
-        notify(`Survey ${survey.surveyId} status toggled`);
+        setMsg({ type: 'success', text: 'Referral reward rules updated successfully!' });
         loadAdminData();
+        if (onRefreshData) onRefreshData();
       }
     } catch (err) {
-      notify('Error toggling survey', 'error');
+      setMsg({ type: 'error', text: 'Failed to save referral settings' });
+    } finally {
+      setSavingReferral(false);
     }
   };
 
+  const handleTogglePayoutMethod = async (methodObj) => {
+    try {
+      const res = await fetch(`/api/admin/payout-methods/${methodObj.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: !methodObj.active })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMsg({ type: 'success', text: `Payout method '${methodObj.name}' updated!` });
+        loadAdminData();
+      }
+    } catch (err) {
+      setMsg({ type: 'error', text: 'Failed to update payout method' });
+    }
+  };
+
+  const filteredUsers = users.filter(u =>
+    u.name?.toLowerCase().includes(searchUser.toLowerCase()) ||
+    u.username?.toLowerCase().includes(searchUser.toLowerCase()) ||
+    u.telegram_user_id?.includes(searchUser)
+  );
+
   return (
-    <div style={{ padding: '16px', background: '#0a0e17', minHeight: '100vh', color: '#fff' }}>
-      {/* Admin Top Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+    <div style={{ padding: '16px', background: '#070a12', minHeight: 'calc(100vh - 60px)', color: '#fff' }}>
+      {/* Admin Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', padding: '14px', borderRadius: 'var(--radius-lg)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '14px',
-            background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)'
-          }}>
-            <Shield size={24} color="#fff" />
-          </div>
+          <Shield size={24} color="var(--accent-gold)" />
           <div>
-            <h1 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0 }}>Survey King Admin 👑</h1>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Platform Management & Payout Control</div>
+            <h1 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--accent-gold)', margin: 0 }}>
+              Survey King — Admin Control Panel 👑
+            </h1>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0 }}>
+              Live system management, user banning, payouts, referral rules & tier settings
+            </p>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn-secondary" style={{ padding: '8px 12px' }} onClick={loadAdminData}>
-            <RefreshCw size={14} />
-          </button>
-          <button className="btn-secondary" style={{ padding: '8px 14px', background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)' }} onClick={onClose}>
-            Close Admin
-          </button>
-        </div>
+        <button className="btn-secondary" style={{ width: 'auto', padding: '6px 12px' }} onClick={onClose}>
+          <X size={16} />
+        </button>
       </div>
 
-      {/* Notification Toast */}
-      {notification && (
+      {msg && (
         <div style={{
           padding: '10px 14px',
           borderRadius: 'var(--radius-md)',
-          marginBottom: '16px',
+          marginBottom: '14px',
           fontSize: '0.85rem',
-          fontWeight: 600,
-          background: notification.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-          color: notification.type === 'success' ? 'var(--accent-green)' : '#ef4444',
-          border: `1px solid ${notification.type === 'success' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`
+          background: msg.type === 'success' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+          color: msg.type === 'success' ? 'var(--accent-green)' : '#ef4444',
+          border: `1px solid ${msg.type === 'success' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`
         }}>
-          {notification.msg}
+          {msg.text}
         </div>
       )}
 
-      {/* Admin Tab Buttons */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', overflowX: 'auto', paddingBottom: '4px' }}>
-        {[
-          { id: 'overview', label: '📊 Overview', icon: Shield },
-          { id: 'users', label: `👥 Users (${stats?.totalUsers || 0})`, icon: Users },
-          { id: 'withdrawals', label: `💸 Payouts (${stats?.pendingWithdrawalsCount || 0})`, icon: Wallet },
-          { id: 'surveys', label: `🎯 Surveys (${surveys.length})`, icon: Target }
-        ].map(t => (
-          <button
-            key={t.id}
-            onClick={() => setAdminTab(t.id)}
-            style={{
-              padding: '8px 14px',
-              borderRadius: 'var(--radius-md)',
-              border: adminTab === t.id ? '1px solid var(--accent-gold)' : '1px solid var(--border-color)',
-              background: adminTab === t.id ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-              color: adminTab === t.id ? 'var(--accent-gold)' : 'var(--text-secondary)',
-              fontSize: '0.85rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* Admin Sub-Tabs Navigation */}
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '16px' }}>
+        <button
+          className={`btn-secondary ${activeTab === 'overview' ? 'active-pill' : ''}`}
+          style={{ padding: '8px 14px', fontSize: '0.8rem', width: 'auto', borderRadius: '9999px' }}
+          onClick={() => setActiveTab('overview')}
+        >
+          Overview KPIs
+        </button>
+
+        <button
+          className={`btn-secondary ${activeTab === 'users' ? 'active-pill' : ''}`}
+          style={{ padding: '8px 14px', fontSize: '0.8rem', width: 'auto', borderRadius: '9999px' }}
+          onClick={() => setActiveTab('users')}
+        >
+          Users ({users.length})
+        </button>
+
+        <button
+          className={`btn-secondary ${activeTab === 'withdrawals' ? 'active-pill' : ''}`}
+          style={{ padding: '8px 14px', fontSize: '0.8rem', width: 'auto', borderRadius: '9999px' }}
+          onClick={() => setActiveTab('withdrawals')}
+        >
+          Withdrawals Queue
+        </button>
+
+        <button
+          className={`btn-secondary ${activeTab === 'referrals' ? 'active-pill' : ''}`}
+          style={{ padding: '8px 14px', fontSize: '0.8rem', width: 'auto', borderRadius: '9999px' }}
+          onClick={() => setActiveTab('referrals')}
+        >
+          Referral Rules 👥
+        </button>
+
+        <button
+          className={`btn-secondary ${activeTab === 'payouts' ? 'active-pill' : ''}`}
+          style={{ padding: '8px 14px', fontSize: '0.8rem', width: 'auto', borderRadius: '9999px' }}
+          onClick={() => setActiveTab('payouts')}
+        >
+          Payout Options 💳
+        </button>
       </div>
 
-      {/* TAB 1: OVERVIEW */}
-      {adminTab === 'overview' && (
+      {/* TAB 1: OVERVIEW KPIs */}
+      {activeTab === 'overview' && (
         <div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-            <div style={{ background: 'var(--bg-card)', padding: '16px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>TOTAL USERS</div>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fff', marginTop: '4px' }}>{stats?.totalUsers || 0}</div>
-              <div style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '4px' }}>{stats?.bannedUsers || 0} Banned</div>
+            <div className="glass-card" style={{ padding: '16px' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>TOTAL REGISTERED USERS</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fff', marginTop: '4px' }}>
+                {stats?.totalUsers || 0}
+              </div>
             </div>
 
-            <div style={{ background: 'var(--bg-card)', padding: '16px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>PENDING PAYOUTS</div>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-gold)', marginTop: '4px' }}>{stats?.pendingWithdrawalsCount || 0} Requests</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--accent-gold)', marginTop: '4px' }}>≈ ₹{stats?.pendingWithdrawalsRupees || '0.00'}</div>
+            <div className="glass-card" style={{ padding: '16px' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>BANNED USERS</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#ef4444', marginTop: '4px' }}>
+                {stats?.bannedUsers || 0}
+              </div>
             </div>
 
-            <div style={{ background: 'var(--bg-card)', padding: '16px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>TOTAL PAID OUT</div>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-green)', marginTop: '4px' }}>₹{stats?.totalPaidOutRupees || '0.00'}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>{stats?.totalPaidOutCoins?.toLocaleString() || 0} Coins</div>
+            <div className="glass-card" style={{ padding: '16px' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>PENDING WITHDRAWALS</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-gold)', marginTop: '4px' }}>
+                {stats?.pendingWithdrawals || 0}
+              </div>
             </div>
 
-            <div style={{ background: 'var(--bg-card)', padding: '16px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>SURVEYS COMPLETED</div>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fff', marginTop: '4px' }}>{stats?.completedSurveys || 0} 🎯</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Verified Webhooks</div>
+            <div className="glass-card" style={{ padding: '16px' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>TOTAL PAID OUT (INR)</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-green)', marginTop: '4px' }}>
+                ₹{stats?.totalApprovedWithdrawalsInr ? stats.totalApprovedWithdrawalsInr.toFixed(2) : '0.00'}
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {/* TAB 2: USERS MANAGEMENT */}
-      {adminTab === 'users' && (
+      {activeTab === 'users' && (
         <div>
-          <form onSubmit={handleSearchUsers} style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-            <input
-              type="text"
-              className="input-field"
-              placeholder="Search by Name, Username, or TG ID..."
-              value={userSearch}
-              onChange={(e) => setUserSearch(e.target.value)}
-            />
-            <button type="submit" className="btn-primary" style={{ width: 'auto', padding: '0 16px' }}>
-              Search
-            </button>
-          </form>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="🔍 Search user by Name, Username or Telegram ID..."
+            value={searchUser}
+            onChange={(e) => setSearchUser(e.target.value)}
+            style={{ marginBottom: '14px' }}
+          />
 
-          <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-            {users.map(u => (
-              <div key={u.id} style={{ padding: '14px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {filteredUsers.map((u) => (
+            <div key={u.id} className="glass-card" style={{ marginBottom: '10px', padding: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>{u.name}</span>
-                    <span className={`badge ${u.status === 'BANNED' ? '' : 'badge-green'}`} style={{ background: u.status === 'BANNED' ? 'rgba(239, 68, 68, 0.2)' : undefined, color: u.status === 'BANNED' ? '#ef4444' : undefined }}>
-                      {u.status}
-                    </span>
+                  <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#fff' }}>
+                    {u.name} <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>(@{u.username})</span>
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    @{u.username} • TG ID: {u.telegramUserId} • Ref: {u.referralCode}
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    ID: {u.telegram_user_id} | Code: {u.referral_code}
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--accent-gold)', marginTop: '4px', fontWeight: 600 }}>
-                    Balance: {u.balance.toLocaleString()} 🪙 (≈ ₹{u.balanceRupees}) • Surveys: {u.completedSurveysCount}
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-gold)', marginTop: '2px' }}>
+                    Balance: {parseFloat(u.balance || 0).toLocaleString()} 🪙 (≈ ₹{(parseFloat(u.balance || 0)/100).toFixed(2)})
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button
-                    className="btn-secondary"
-                    style={{ padding: '6px 10px', fontSize: '0.75rem' }}
-                    onClick={() => setAdjustingUser(u)}
-                  >
-                    🪙 Coins
-                  </button>
-
-                  <button
-                    className="btn-secondary"
-                    style={{
-                      padding: '6px 10px',
-                      fontSize: '0.75rem',
-                      background: u.status === 'BANNED' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                      color: u.status === 'BANNED' ? 'var(--accent-green)' : '#ef4444'
-                    }}
-                    onClick={() => handleToggleBan(u)}
-                  >
-                    {u.status === 'BANNED' ? 'Unban' : 'Ban'}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: WITHDRAWALS APPROVAL QUEUE */}
-      {adminTab === 'withdrawals' && (
-        <div>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '12px' }}>UPI Payout Requests Queue</h2>
-
-          {withdrawals.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
-              No pending or processed withdrawal requests found.
-            </div>
-          ) : (
-            withdrawals.map(w => (
-              <div key={w.id} style={{
-                background: 'var(--bg-card)',
-                borderRadius: 'var(--radius-lg)',
-                border: '1px solid var(--border-color)',
-                padding: '16px',
-                marginBottom: '12px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div>
-                    <span style={{ fontWeight: 800, fontSize: '1rem', color: '#fff' }}>{w.userName}</span>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '8px' }}>@{w.userUsername}</span>
-                  </div>
-
-                  <span className={`badge ${w.status === 'APPROVED' ? 'badge-green' : ''}`} style={{
-                    background: w.status === 'PENDING' ? 'rgba(245, 158, 11, 0.2)' : w.status === 'REJECTED' ? 'rgba(239, 68, 68, 0.2)' : undefined,
-                    color: w.status === 'PENDING' ? 'var(--accent-gold)' : w.status === 'REJECTED' ? '#ef4444' : undefined
-                  }}>
-                    {w.status}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
+                  <span className={`badge ${u.status === 'ACTIVE' ? 'badge-green' : 'badge-red'}`}>
+                    {u.status}
                   </span>
-                </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '10px 0' }}>
-                  <div>
-                    UPI ID: <strong style={{ color: '#fff' }}>{w.upiId}</strong>
-                  </div>
-                  <div>
-                    Payout Value: <strong style={{ color: 'var(--accent-green)' }}>₹{w.rupeeValue} INR</strong> ({w.amountCoins.toLocaleString()} 🪙)
-                  </div>
-                </div>
-
-                {w.status === 'PENDING' && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '12px' }}>
-                    <button
-                      className="btn-primary"
-                      style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#fff', fontSize: '0.85rem', padding: '10px' }}
-                      onClick={() => handleWithdrawalAction(w.id, 'APPROVE')}
-                    >
-                      <Check size={16} /> Approve & Mark Paid
-                    </button>
-
+                  <div style={{ display: 'flex', gap: '6px' }}>
                     <button
                       className="btn-secondary"
-                      style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.4)', fontSize: '0.85rem', padding: '10px' }}
-                      onClick={() => handleWithdrawalAction(w.id, 'REJECT')}
+                      style={{ padding: '4px 8px', fontSize: '0.7rem', width: 'auto' }}
+                      onClick={() => setBalanceModalUser(u)}
                     >
-                      <X size={16} /> Reject & Refund Coins
+                      Coins ±
+                    </button>
+
+                    <button
+                      style={{
+                        padding: '4px 8px',
+                        fontSize: '0.7rem',
+                        borderRadius: 'var(--radius-sm)',
+                        border: 'none',
+                        background: u.status === 'ACTIVE' ? '#ef4444' : '#10b981',
+                        color: '#fff',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => handleToggleUserStatus(u.id, u.status)}
+                    >
+                      {u.status === 'ACTIVE' ? 'Ban 🚫' : 'Unban 🟢'}
                     </button>
                   </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* TAB 4: SURVEY MANAGER */}
-      {adminTab === 'surveys' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Survey Catalog Manager</h2>
-            <button className="btn-primary" style={{ width: 'auto', padding: '8px 14px', fontSize: '0.85rem' }} onClick={() => setShowAddSurvey(true)}>
-              <Plus size={16} /> Add New Survey
-            </button>
-          </div>
-
-          {surveys.map(s => (
-            <div key={s.id} className="survey-card">
-              <div className="survey-header">
-                <div className="survey-icon-title">
-                  <div className="survey-icon">{s.icon || '🎯'}</div>
-                  <div>
-                    <div className="survey-title">{s.title}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      ID: {s.surveyId} • Provider: {s.provider}
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ textAlign: 'right' }}>
-                  <div className="survey-reward">+{s.reward.toLocaleString()} 🪙</div>
-                  <button
-                    style={{ background: 'none', border: 'none', color: s.active ? 'var(--accent-green)' : 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', marginTop: '4px' }}
-                    onClick={() => handleToggleSurvey(s)}
-                  >
-                    {s.active ? '● Active' : '○ Inactive'}
-                  </button>
                 </div>
               </div>
             </div>
@@ -452,116 +390,196 @@ export default function AdminPanel({ onClose }) {
         </div>
       )}
 
-      {/* Modal: Adjust User Balance */}
-      {adjustingUser && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', marginBottom: '8px' }}>
-              🪙 Adjust Coins for {adjustingUser.name}
-            </h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
-              Current Balance: {adjustingUser.balance.toLocaleString()} Coins (≈ ₹{adjustingUser.balanceRupees})
-            </p>
+      {/* TAB 3: WITHDRAWALS QUEUE */}
+      {activeTab === 'withdrawals' && (
+        <div>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', marginBottom: '10px' }}>
+            Pending & History Payout Queue
+          </h3>
 
-            <form onSubmit={handleBalanceSubmit}>
-              <div className="input-group">
-                <label className="input-label">Coins to Add (+) or Deduct (-)</label>
-                <input
-                  type="number"
-                  className="input-field"
-                  placeholder="e.g. 5000 or -2000"
-                  value={adjustAmount}
-                  onChange={(e) => setAdjustAmount(e.target.value)}
-                  required
-                />
-              </div>
+          {withdrawals.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>No withdrawal requests found.</div>
+          ) : (
+            withdrawals.map((w) => (
+              <div key={w.id} className="glass-card" style={{ marginBottom: '10px', padding: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#fff' }}>
+                      {w.userName} (@{w.userUsername})
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--accent-gold)', fontWeight: 700 }}>
+                      {w.method || 'UPI'} Payout: {parseFloat(w.amount).toLocaleString()} 🪙 (₹{w.rupeeAmount.toFixed(2)} INR)
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      Destination: <code style={{ color: 'var(--accent-green)' }}>{w.upiId}</code>
+                    </div>
+                  </div>
 
-              <div className="input-group">
-                <label className="input-label">Reason / Description</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  placeholder="e.g. Compensation bonus or correction"
-                  value={adjustReason}
-                  onChange={(e) => setAdjustReason(e.target.value)}
-                />
+                  <div>
+                    {w.status === 'PENDING' ? (
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          style={{ background: '#10b981', color: '#fff', border: 'none', padding: '6px 10px', borderRadius: 'var(--radius-sm)', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
+                          onClick={() => handleProcessWithdrawal(w.id, 'APPROVE')}
+                        >
+                          Approve ✅
+                        </button>
+                        <button
+                          style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '6px 10px', borderRadius: 'var(--radius-sm)', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
+                          onClick={() => handleProcessWithdrawal(w.id, 'REJECT')}
+                        >
+                          Reject & Refund ❌
+                        </button>
+                      </div>
+                    ) : (
+                      <span className={`badge ${w.status === 'APPROVED' ? 'badge-green' : 'badge-red'}`}>
+                        {w.status}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '16px' }}>
-                <button type="button" className="btn-secondary" onClick={() => setAdjustingUser(null)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary">
-                  Save Adjustment
-                </button>
-              </div>
-            </form>
-          </div>
+            ))
+          )}
         </div>
       )}
 
-      {/* Modal: Add New Survey */}
-      {showAddSurvey && (
+      {/* TAB 4: REFERRAL RULES CONFIGURATION */}
+      {activeTab === 'referrals' && (
+        <div className="glass-card">
+          <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--accent-gold)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Gift size={20} />
+            <span>Referral Program Settings Engine</span>
+          </h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+            Customize referral reward coins for inviter & invited friend, and trigger conditions.
+          </p>
+
+          <form onSubmit={handleSaveReferralSettings}>
+            <div className="input-group">
+              <label className="input-label">Referrer Reward Coins (Inviter User)</label>
+              <input
+                type="number"
+                className="input-field"
+                value={referralSettings.referrerRewardCoins}
+                onChange={(e) => setReferralSettings({ ...referralSettings, referrerRewardCoins: e.target.value })}
+                placeholder="1000"
+                required
+              />
+            </div>
+
+            <div className="input-group">
+              <label className="input-label">Referee Reward Coins (Invited Friend)</label>
+              <input
+                type="number"
+                className="input-field"
+                value={referralSettings.refereeRewardCoins}
+                onChange={(e) => setReferralSettings({ ...referralSettings, refereeRewardCoins: e.target.value })}
+                placeholder="500"
+                required
+              />
+            </div>
+
+            <div className="input-group">
+              <label className="input-label">Reward Trigger Condition Rule</label>
+              <select
+                className="input-field"
+                value={referralSettings.referralTrigger}
+                onChange={(e) => setReferralSettings({ ...referralSettings, referralTrigger: e.target.value })}
+              >
+                <option value="FIRST_SURVEY">On Completing 1st Survey (Recommended)</option>
+                <option value="ON_JOIN">On Sign Up / Bot Registration (/start)</option>
+              </select>
+            </div>
+
+            <button type="submit" className="btn-primary" disabled={savingReferral}>
+              <Save size={16} />
+              <span>{savingReferral ? 'Saving Rules...' : 'Save Referral Rules'}</span>
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* TAB 5: PAYOUT OPTIONS & TIERS */}
+      {activeTab === 'payouts' && (
+        <div>
+          <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--accent-gold)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <CreditCard size={20} />
+            <span>Payout Options & Coin Tiers</span>
+          </h3>
+
+          {payoutMethods.map((m) => (
+            <div key={m.id} className="glass-card" style={{ marginBottom: '12px', padding: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1.4rem' }}>{m.icon}</span>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#fff' }}>{m.name}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>ID: {m.methodId}</div>
+                  </div>
+                </div>
+
+                <button
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '9999px',
+                    border: 'none',
+                    background: m.active ? '#10b981' : '#ef4444',
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: '0.75rem',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => handleTogglePayoutMethod(m)}
+                >
+                  {m.active ? 'Active 🟢' : 'Disabled 🔴'}
+                </button>
+              </div>
+
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '6px' }}>Configured Tiers:</div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {m.tiers?.map((t, i) => (
+                  <span key={i} className="badge badge-gold">
+                    ₹{t.rupees} = {t.coins.toLocaleString()} 🪙
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* BALANCE ADJUSTMENT MODAL */}
+      {balanceModalUser && (
         <div className="modal-overlay">
-          <div className="modal-content">
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', marginBottom: '14px' }}>
-              🎯 Add New Custom Survey
-            </h2>
+          <div className="modal-content" style={{ maxWidth: '380px' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', marginBottom: '4px' }}>
+              Adjust Coin Balance for {balanceModalUser.name}
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+              Enter positive coins to add (e.g. 5000) or negative to deduct (e.g. -2000).
+            </p>
 
-            <form onSubmit={handleCreateSurvey}>
+            <form onSubmit={handleAdjustBalance}>
               <div className="input-group">
-                <label className="input-label">Survey Title</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  placeholder="e.g. E-Commerce Shopping Habits"
-                  value={newSurvey.title}
-                  onChange={(e) => setNewSurvey({ ...newSurvey, title: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="input-group">
-                <label className="input-label">Reward in Coins (1,000 Coins = ₹10)</label>
+                <label className="input-label">Coin Amount Adjustment</label>
                 <input
                   type="number"
                   className="input-field"
-                  placeholder="e.g. 5000"
-                  value={newSurvey.reward}
-                  onChange={(e) => setNewSurvey({ ...newSurvey, reward: e.target.value })}
+                  placeholder="+5000 or -2000"
+                  value={coinAdjustment}
+                  onChange={(e) => setCoinAdjustment(e.target.value)}
                   required
                 />
               </div>
 
-              <div className="input-group">
-                <label className="input-label">Estimated Minutes</label>
-                <input
-                  type="number"
-                  className="input-field"
-                  placeholder="e.g. 6"
-                  value={newSurvey.estimatedMinutes}
-                  onChange={(e) => setNewSurvey({ ...newSurvey, estimatedMinutes: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="input-group">
-                <label className="input-label">Provider</label>
-                <input
-                  type="text"
-                  className="input-field"
-                  placeholder="CPX Research / BitLabs / Google"
-                  value={newSurvey.provider}
-                  onChange={(e) => setNewSurvey({ ...newSurvey, provider: e.target.value })}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '16px' }}>
-                <button type="button" className="btn-secondary" onClick={() => setShowAddSurvey(false)}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '14px' }}>
+                <button type="button" className="btn-secondary" onClick={() => setBalanceModalUser(null)}>
                   Cancel
                 </button>
+
                 <button type="submit" className="btn-primary">
-                  Create Survey
+                  Save Balance
                 </button>
               </div>
             </form>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Target, Wallet, User, Crown, Shield } from 'lucide-react';
+import { Home, Target, Wallet, User, Crown, Shield, Sparkles } from 'lucide-react';
 import HomeTab from './components/HomeTab';
 import SurveysTab from './components/SurveysTab';
 import EarningsTab from './components/EarningsTab';
@@ -14,6 +14,9 @@ export default function App() {
   const [transactions, setTransactions] = useState([]);
   const [referrals, setReferrals] = useState([]);
   const [activeParticipation, setActiveParticipation] = useState(null);
+  const [cpxOfferwallUrl, setCpxOfferwallUrl] = useState('');
+  const [payoutMethods, setPayoutMethods] = useState([]);
+  const [referralSettings, setReferralSettings] = useState({ referrerRewardCoins: 1000, refereeRewardCoins: 500, referralTrigger: 'FIRST_SURVEY' });
   const [loading, setLoading] = useState(true);
 
   // Initialize Telegram WebApp & Authenticate
@@ -59,7 +62,6 @@ export default function App() {
       }
     } catch (err) {
       console.error('Authentication error:', err);
-      // Fallback dev user
       setUser({
         id: 1,
         telegramUserId: '123456789',
@@ -73,8 +75,6 @@ export default function App() {
       setLoading(false);
     }
   };
-
-  const [cpxOfferwallUrl, setCpxOfferwallUrl] = useState('');
 
   const loadUserData = async (tgUserId) => {
     try {
@@ -100,6 +100,15 @@ export default function App() {
       const rRes = await fetch(`/api/telegram/referrals?telegramUserId=${tgUserId}`);
       const rData = await rRes.json();
       if (rData.success) setReferrals(rData.referrals);
+
+      // 5. Fetch Payout Methods & Referral Settings
+      const pmRes = await fetch('/api/admin/payout-methods');
+      const pmData = await pmRes.json();
+      if (pmData.success) setPayoutMethods(pmData.payoutMethods);
+
+      const refRes = await fetch('/api/admin/referral-settings');
+      const refData = await refRes.json();
+      if (refData.success) setReferralSettings(refData.settings);
     } catch (err) {
       console.error('Failed to load user data:', err);
     }
@@ -157,7 +166,7 @@ export default function App() {
   };
 
   // Request Withdrawal Handler
-  const handleRequestWithdrawal = async (amount, upiId) => {
+  const handleRequestWithdrawal = async (amount, upiId, method = 'UPI') => {
     if (!user) return;
     const res = await fetch('/api/telegram/withdraw', {
       method: 'POST',
@@ -165,7 +174,8 @@ export default function App() {
       body: JSON.stringify({
         telegramUserId: user.telegramUserId,
         amount,
-        upiId
+        upiId,
+        method
       })
     });
 
@@ -178,10 +188,10 @@ export default function App() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: '16px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: '16px', background: '#0a0e17' }}>
         <div style={{
-          width: '60px',
-          height: '60px',
+          width: '64px',
+          height: '64px',
           borderRadius: '20px',
           background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
           display: 'flex',
@@ -189,47 +199,78 @@ export default function App() {
           justifyContent: 'center',
           boxShadow: '0 10px 25px rgba(245, 158, 11, 0.5)'
         }}>
-          <Crown size={36} color="#000" />
+          <Crown size={38} color="#000" />
         </div>
-        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fff' }}>SURVEY KING 👑</div>
+        <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>SURVEY KING 👑</div>
         <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Loading your dashboard...</div>
       </div>
     );
   }
 
   return (
-    <div style={{ width: '100%', minHeight: '100vh', position: 'relative' }}>
-      {/* Admin Quick Launch Floating Button */}
-      <button
-        onClick={() => setShowAdmin(!showAdmin)}
-        style={{
-          position: 'fixed',
-          top: '12px',
-          right: '12px',
-          zIndex: 150,
-          background: showAdmin ? '#ef4444' : 'rgba(245, 158, 11, 0.2)',
-          border: `1px solid ${showAdmin ? '#ef4444' : 'var(--accent-gold)'}`,
-          color: showAdmin ? '#fff' : 'var(--accent-gold)',
-          padding: '6px 12px',
-          borderRadius: '9999px',
-          fontSize: '0.75rem',
-          fontWeight: 700,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-          cursor: 'pointer',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)'
-        }}
-      >
-        <Shield size={14} />
-        <span>{showAdmin ? 'Close Admin' : '👑 Admin Panel'}</span>
-      </button>
+    <div style={{ width: '100%', minHeight: '100vh', position: 'relative', background: '#0a0e17' }}>
+      {/* Top Application Header Bar */}
+      <header style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 140,
+        background: 'rgba(10, 14, 23, 0.95)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        borderBottom: '1px solid var(--border-color)',
+        padding: '12px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            width: '36px',
+            height: '36px',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)'
+          }}>
+            <Crown size={20} color="#000" />
+          </div>
+          <div>
+            <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>SURVEY KING 👑</div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>1,000 🪙 = ₹10 INR</div>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setShowAdmin(!showAdmin)}
+          style={{
+            background: showAdmin ? '#ef4444' : 'rgba(245, 158, 11, 0.15)',
+            border: `1px solid ${showAdmin ? '#ef4444' : 'rgba(245, 158, 11, 0.4)'}`,
+            color: showAdmin ? '#fff' : 'var(--accent-gold)',
+            padding: '6px 12px',
+            borderRadius: '9999px',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            cursor: 'pointer'
+          }}
+        >
+          <Shield size={14} />
+          <span>{showAdmin ? 'Close Admin' : 'Admin Panel'}</span>
+        </button>
+      </header>
 
       {showAdmin ? (
-        <AdminPanel onClose={() => setShowAdmin(false)} />
+        <AdminPanel
+          onClose={() => setShowAdmin(false)}
+          onRefreshData={() => user && loadUserData(user.telegramUserId)}
+        />
       ) : (
         <>
-          {/* Tab Screen Content */}
+          {/* Screen Content */}
           {activeTab === 'home' && (
             <HomeTab
               user={user}
@@ -253,6 +294,7 @@ export default function App() {
             <EarningsTab
               user={user}
               transactions={transactions}
+              payoutMethods={payoutMethods}
               onRequestWithdrawal={handleRequestWithdrawal}
             />
           )}
@@ -261,11 +303,12 @@ export default function App() {
             <ProfileTab
               user={user}
               referrals={referrals}
+              referralSettings={referralSettings}
               onCompleteWebhook={handleCompleteWebhook}
             />
           )}
 
-          {/* Bottom Fixed Navigation Bar */}
+          {/* Bottom Navigation Bar */}
           <nav className="bottom-nav">
             <button
               className={`nav-item ${activeTab === 'home' ? 'active' : ''}`}

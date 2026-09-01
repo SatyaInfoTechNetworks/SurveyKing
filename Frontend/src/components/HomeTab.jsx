@@ -1,5 +1,5 @@
 import React from 'react';
-import { Crown, Sparkles, TrendingUp, ShieldCheck, Play, ArrowRight, Zap, Coins } from 'lucide-react';
+import { Sparkles, TrendingUp, ShieldCheck, Play, ArrowRight, Zap, Coins } from 'lucide-react';
 
 export default function HomeTab({ user, surveys, onStartSurvey, onNavigate }) {
   const topSurveys = surveys.slice(0, 3);
@@ -8,26 +8,13 @@ export default function HomeTab({ user, surveys, onStartSurvey, onNavigate }) {
 
   return (
     <div style={{ padding: '16px' }}>
-      {/* Header Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '14px',
-            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)'
-          }}>
-            <Crown size={24} color="#000" />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Welcome Back</div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff' }}>{user?.name || 'Survey King User'} 👑</div>
-          </div>
+      {/* Welcome Greeting Banner */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Welcome Back</div>
+          <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fff' }}>{user?.name || 'Survey King User'} 👋</div>
         </div>
+
         <div className="badge">
           <Sparkles size={13} />
           <span>VIP Level 1</span>
@@ -37,17 +24,17 @@ export default function HomeTab({ user, surveys, onStartSurvey, onNavigate }) {
       {/* Main Balance Card */}
       <div className="glass-card balance-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>TOTAL COIN BALANCE</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>AVAILABLE COIN BALANCE</span>
           <span className="badge badge-green">1,000 🪙 = ₹10</span>
         </div>
 
         <div className="balance-amount">
-          <Coins size={36} color="var(--accent-gold)" />
+          <Coins size={32} color="var(--accent-gold)" />
           <span>{coins.toLocaleString()}</span>
-          <span style={{ fontSize: '1.1rem', color: 'var(--text-secondary)', fontWeight: 600, marginLeft: '6px' }}>Coins</span>
+          <span style={{ fontSize: '1rem', color: 'var(--text-secondary)', fontWeight: 600, marginLeft: '4px' }}>Coins</span>
         </div>
 
-        <div style={{ fontSize: '0.9rem', color: 'var(--accent-green)', fontWeight: 700, marginBottom: '14px' }}>
+        <div style={{ fontSize: '0.85rem', color: 'var(--accent-green)', fontWeight: 700, marginBottom: '14px' }}>
           ≈ ₹{rupees} INR Payout Value
         </div>
 
@@ -59,7 +46,7 @@ export default function HomeTab({ user, surveys, onStartSurvey, onNavigate }) {
 
           <button className="btn-secondary" onClick={() => onNavigate('earnings')}>
             <TrendingUp size={16} />
-            <span>Withdraw UPI</span>
+            <span>Withdraw Payout</span>
           </button>
         </div>
       </div>
@@ -92,7 +79,7 @@ export default function HomeTab({ user, surveys, onStartSurvey, onNavigate }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Zap size={18} color="var(--accent-gold)" />
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff' }}>Highest Coin Rewards</h2>
+          <h2 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#fff' }}>Highest Coin Rewards</h2>
         </div>
         <button 
           onClick={() => onNavigate('surveys')}
@@ -147,7 +134,7 @@ export default function HomeTab({ user, surveys, onStartSurvey, onNavigate }) {
       }}>
         <ShieldCheck size={28} color="var(--accent-green)" />
         <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-          <strong style={{ color: '#fff' }}>Instant Coin Crediting:</strong> 1,000 Coins equal ₹10.00. Redeem directly to your UPI ID anytime!
+          <strong style={{ color: '#fff' }}>Instant Coin Crediting:</strong> 1,000 Coins equal ₹10.00. Redeem via UPI, Amazon, Paytm, or Google Play anytime!
         </div>
       </div>
     </div>
