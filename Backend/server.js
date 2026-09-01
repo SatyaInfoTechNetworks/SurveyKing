@@ -14,10 +14,26 @@ const PORT = process.env.PORT || 5000;
 
 const fs = require('fs');
 
+// Global Uncaught Exception & Rejection Handlers
+process.on('uncaughtException', (err) => {
+  console.error(`💥 [${new Date().toISOString()}] UNCAUGHT EXCEPTION:`, err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error(`💥 [${new Date().toISOString()}] UNHANDLED REJECTION:`, reason);
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Log Every Incoming HTTP Request to Console
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] 📥 ${req.method} ${req.originalUrl || req.url} - IP: ${req.ip || req.headers['x-forwarded-for'] || 'client'}`);
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Serve Production Frontend Build if available

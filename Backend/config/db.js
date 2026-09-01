@@ -10,6 +10,12 @@ async function initDB() {
   const envPass = process.env.MYSQL_PASSWORD || '@SaiDivya2503';
   const database = process.env.MYSQL_DATABASE || 'surveyking';
 
+  console.log(`====================================================`);
+  console.log(`🔌 INITIALIZING SURVEY KING MYSQL CONNECTION ENGINE`);
+  console.log(`📅 Timestamp: ${new Date().toISOString()}`);
+  console.log(`🎯 Target Database: '${database}'`);
+  console.log(`====================================================`);
+
   const hostsToTry = [
     envHost,
     'host.docker.internal',
@@ -37,6 +43,7 @@ async function initDB() {
     for (const prt of portsToTry) {
       if (connected) break;
       for (const cred of usersToTry) {
+        console.log(`🔄 Attempting MySQL connection candidate -> Host: ${h}:${prt} | User: ${cred.u}...`);
         try {
           // Attempt CREATE DATABASE IF NOT EXISTS 'surveyking'
           try {
@@ -49,6 +56,7 @@ async function initDB() {
             });
             await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${database}\`;`);
             await rootConn.end();
+            console.log(`📦 Ensured database '${database}' exists on ${h}:${prt}`);
           } catch (createDbErr) {
             // Ignore privilege error if DB already exists
           }
@@ -65,21 +73,26 @@ async function initDB() {
           });
 
           const conn = await testPool.getConnection();
-          console.log(`👑 Strictly Connected to Internal MySQL Database '${database}' at ${h}:${prt} (user: ${cred.u})!`);
+          console.log(`====================================================`);
+          console.log(`👑 SUCCESS! Connected to MySQL Database '${database}'`);
+          console.log(`📍 Host: ${h}:${prt} | User: ${cred.u}`);
+          console.log(`====================================================`);
           conn.release();
 
           mysqlPool = testPool;
           connected = true;
           break;
         } catch (err) {
-          // Connection failed, try next candidate combination
+          console.warn(`❌ MySQL candidate failed (${h}:${prt} - ${cred.u}): ${err.message}`);
         }
       }
     }
   }
 
   if (!connected) {
-    console.error(`❌ CRITICAL ERROR: Failed to connect to MySQL database '${database}'. SQLite fallback is DISABLED.`);
+    console.error(`====================================================`);
+    console.error(`❌ CRITICAL FAILURE: Could not connect to any MySQL host candidate.`);
+    console.error(`====================================================`);
     throw new Error(`Failed to connect to MySQL database '${database}'.`);
   }
 
@@ -99,7 +112,7 @@ async function execute(sql, params = []) {
 }
 
 async function createTables() {
-  console.log(`📦 Setting up Survey King schema & tables in MySQL database 'surveyking'...`);
+  console.log(`📦 Creating/verifying Survey King table schemas in MySQL database 'surveyking'...`);
 
   await mysqlPool.execute(`
     CREATE TABLE IF NOT EXISTS users (
@@ -224,7 +237,7 @@ async function createTables() {
   `);
 
   await seedDefaults();
-  console.log(`✅ All MySQL database tables in 'surveyking' created and ready!`);
+  console.log(`✅ All MySQL database tables in 'surveyking' verified and ready!`);
 }
 
 async function seedDefaults() {
