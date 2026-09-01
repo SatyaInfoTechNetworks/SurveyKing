@@ -194,6 +194,7 @@ async function createTables() {
         referrer_reward_coins INT DEFAULT 1000,
         referee_reward_coins INT DEFAULT 500,
         referral_trigger VARCHAR(50) DEFAULT 'FIRST_SURVEY',
+        min_survey_reward_coins INT DEFAULT 100,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB;
     `);
@@ -299,6 +300,7 @@ async function createTables() {
         referrer_reward_coins INTEGER DEFAULT 1000,
         referee_reward_coins INTEGER DEFAULT 500,
         referral_trigger TEXT DEFAULT 'FIRST_SURVEY',
+        min_survey_reward_coins INTEGER DEFAULT 100,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -327,8 +329,8 @@ async function seedDefaults() {
   const sCount = settingsRows[0]?.cnt || settingsRows[0]?.['COUNT(*)'] || 0;
   if (sCount === 0) {
     await execute(
-      `INSERT INTO platform_settings (id, referrer_reward_coins, referee_reward_coins, referral_trigger) 
-       VALUES (1, 1000, 500, 'FIRST_SURVEY')`
+      `INSERT INTO platform_settings (id, referrer_reward_coins, referee_reward_coins, referral_trigger, min_survey_reward_coins) 
+       VALUES (1, 1000, 500, 'FIRST_SURVEY', 100)`
     );
     console.log('✅ Default platform referral settings initialized!');
   }

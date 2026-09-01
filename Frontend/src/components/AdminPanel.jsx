@@ -481,6 +481,21 @@ export default function AdminPanel({ onClose, onRefreshData }) {
             </div>
 
             <div className="input-group">
+              <label className="input-label">Minimum Survey Reward Coins for Referral Qualification</label>
+              <input
+                type="number"
+                className="input-field"
+                value={referralSettings.minSurveyRewardCoins || 100}
+                onChange={(e) => setReferralSettings({ ...referralSettings, minSurveyRewardCoins: e.target.value })}
+                placeholder="100"
+                required
+              />
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                Only surveys with reward &ge; this value (default 100 Coins) will qualify the referral.
+              </span>
+            </div>
+
+            <div className="input-group">
               <label className="input-label">Reward Trigger Condition Rule</label>
               <select
                 className="input-field"

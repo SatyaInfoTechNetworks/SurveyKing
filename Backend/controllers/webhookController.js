@@ -70,60 +70,65 @@ async function handleWebhook(req, res) {
 
     // Fetch Dynamic Referral Settings from platform_settings table
     const settingsRows = await db.query('SELECT * FROM platform_settings WHERE id = 1');
-    const refSettings = settingsRows[0] || { referrer_reward_coins: 1000, referee_reward_coins: 500, referral_trigger: 'FIRST_SURVEY' };
+    const refSettings = settingsRows[0] || { referrer_reward_coins: 1000, referee_reward_coins: 500, referral_trigger: 'FIRST_SURVEY', min_survey_reward_coins: 100 };
 
+    const minSurveyReward = parseFloat(refSettings.min_survey_reward_coins || 100);
     let referralBonusCredited = false;
     let refereeBonusCredited = false;
 
     if (refSettings.referral_trigger === 'FIRST_SURVEY') {
-      const pendingRefs = await db.query(
-        `SELECT * FROM referrals WHERE referred_user_id = ? AND status = 'PENDING'`,
-        [user.id]
-      );
+      if (rewardAmt >= minSurveyReward) {
+        const pendingRefs = await db.query(
+          `SELECT * FROM referrals WHERE referred_user_id = ? AND status = 'PENDING'`,
+          [user.id]
+        );
 
-      if (pendingRefs.length > 0) {
-        const referral = pendingRefs[0];
-        const referrerId = referral.referrer_user_id;
-        const referrerReward = parseFloat(refSettings.referrer_reward_coins || 1000);
-        const refereeReward = parseFloat(refSettings.referee_reward_coins || 500);
+        if (pendingRefs.length > 0) {
+          const referral = pendingRefs[0];
+          const referrerId = referral.referrer_user_id;
+          const referrerReward = parseFloat(refSettings.referrer_reward_coins || 1000);
+          const refereeReward = parseFloat(refSettings.referee_reward_coins || 500);
 
-        // Qualify referral
-        await db.execute(`UPDATE referrals SET status = 'QUALIFIED', reward_amount = ? WHERE id = ?`, [referrerReward, referral.id]);
+          // Qualify referral
+          await db.execute(`UPDATE referrals SET status = 'QUALIFIED', reward_amount = ? WHERE id = ?`, [referrerReward, referral.id]);
 
-        // 1. Credit Referrer User
-        const referrers = await db.query(`SELECT * FROM users WHERE id = ?`, [referrerId]);
-        if (referrers.length > 0) {
-          const referrer = referrers[0];
-          const referrerNewBalance = parseFloat(referrer.balance || 0) + referrerReward;
+          // 1. Credit Referrer User
+          const referrers = await db.query(`SELECT * FROM users WHERE id = ?`, [referrerId]);
+          if (referrers.length > 0) {
+            const referrer = referrers[0];
+            const referrerNewBalance = parseFloat(referrer.balance || 0) + referrerReward;
 
-          await db.execute(`UPDATE users SET balance = ? WHERE id = ?`, [referrerNewBalance, referrer.id]);
+            await db.execute(`UPDATE users SET balance = ? WHERE id = ?`, [referrerNewBalance, referrer.id]);
 
-          await db.execute(
-            `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
-             VALUES (?, 'REFERRAL_REWARD', ?, ?, ?)`,
-            [referrer.id, referrerReward, `REF_${referral.id}`, `Referral bonus for inviting ${user.name}`]
-          );
+            await db.execute(
+              `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
+               VALUES (?, 'REFERRAL_REWARD', ?, ?, ?)`,
+              [referrer.id, referrerReward, `REF_${referral.id}`, `Referral bonus for inviting ${user.name}`]
+            );
 
-          console.log(`👥 Referral Qualified! Credited ${referrerReward.toLocaleString()} Coins to Referrer ${referrer.name} (ID: ${referrer.id})`);
-          referralBonusCredited = true;
+            console.log(`👥 Referral Qualified! Credited ${referrerReward.toLocaleString()} Coins to Referrer ${referrer.name} (ID: ${referrer.id})`);
+            referralBonusCredited = true;
+          }
+
+          // 2. Credit Referee User if referee bonus is configured > 0
+          if (refereeReward > 0) {
+            const currentRefBalance = parseFloat(user.balance || 0) + rewardAmt; // Balance after survey reward
+            const updatedUserBalance = currentRefBalance + refereeReward;
+
+            await db.execute(`UPDATE users SET balance = ? WHERE id = ?`, [updatedUserBalance, user.id]);
+
+            await db.execute(
+              `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
+               VALUES (?, 'REFERRAL_WELCOME_BONUS', ?, ?, ?)`,
+              [user.id, refereeReward, `REF_WELCOME_${referral.id}`, `Referral Welcome Bonus for joining via invite`]
+            );
+
+            console.log(`🎁 Welcome Referral Bonus! Credited ${refereeReward.toLocaleString()} Coins to Referee ${user.name} (ID: ${user.id})`);
+            refereeBonusCredited = true;
+          }
         }
-
-        // 2. Credit Referee User if referee bonus is configured > 0
-        if (refereeReward > 0) {
-          const currentRefBalance = parseFloat(user.balance || 0) + rewardAmt; // Balance after survey reward
-          const updatedUserBalance = currentRefBalance + refereeReward;
-
-          await db.execute(`UPDATE users SET balance = ? WHERE id = ?`, [updatedUserBalance, user.id]);
-
-          await db.execute(
-            `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
-             VALUES (?, 'REFERRAL_WELCOME_BONUS', ?, ?, ?)`,
-            [user.id, refereeReward, `REF_WELCOME_${referral.id}`, `Referral Welcome Bonus for joining via invite`]
-          );
-
-          console.log(`🎁 Welcome Referral Bonus! Credited ${refereeReward.toLocaleString()} Coins to Referee ${user.name} (ID: ${user.id})`);
-          refereeBonusCredited = true;
-        }
+      } else {
+        console.log(`ℹ️ Survey reward (${rewardAmt} Coins) is below minimum threshold (${minSurveyReward} Coins). Referral qualification skipped.`);
       }
     }
 

@@ -326,13 +326,14 @@ async function deleteSurvey(req, res) {
 async function getReferralSettings(req, res) {
   try {
     const rows = await db.query('SELECT * FROM platform_settings WHERE id = 1');
-    const settings = rows[0] || { referrer_reward_coins: 1000, referee_reward_coins: 500, referral_trigger: 'FIRST_SURVEY' };
+    const settings = rows[0] || { referrer_reward_coins: 1000, referee_reward_coins: 500, referral_trigger: 'FIRST_SURVEY', min_survey_reward_coins: 100 };
     return res.json({
       success: true,
       settings: {
         referrerRewardCoins: settings.referrer_reward_coins,
         refereeRewardCoins: settings.referee_reward_coins,
-        referralTrigger: settings.referral_trigger
+        referralTrigger: settings.referral_trigger,
+        minSurveyRewardCoins: settings.min_survey_reward_coins
       }
     });
   } catch (err) {
@@ -344,11 +345,11 @@ async function getReferralSettings(req, res) {
 // PUT /api/admin/referral-settings
 async function updateReferralSettings(req, res) {
   try {
-    const { referrerRewardCoins, refereeRewardCoins, referralTrigger } = req.body;
+    const { referrerRewardCoins, refereeRewardCoins, referralTrigger, minSurveyRewardCoins } = req.body;
 
     await db.execute(
-      `UPDATE platform_settings SET referrer_reward_coins = ?, referee_reward_coins = ?, referral_trigger = ? WHERE id = 1`,
-      [parseInt(referrerRewardCoins || 1000, 10), parseInt(refereeRewardCoins || 500, 10), referralTrigger || 'FIRST_SURVEY']
+      `UPDATE platform_settings SET referrer_reward_coins = ?, referee_reward_coins = ?, referral_trigger = ?, min_survey_reward_coins = ? WHERE id = 1`,
+      [parseInt(referrerRewardCoins || 1000, 10), parseInt(refereeRewardCoins || 500, 10), referralTrigger || 'FIRST_SURVEY', parseInt(minSurveyRewardCoins || 100, 10)]
     );
 
     return res.json({
