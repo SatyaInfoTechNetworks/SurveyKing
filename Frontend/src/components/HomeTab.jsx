@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, TrendingUp, ShieldCheck, Play, ArrowRight, Zap, Coins, Clock } from 'lucide-react';
+import { Sparkles, TrendingUp, ShieldCheck, Play, ArrowRight, Zap, Coins, Clock, Trophy, ChevronRight } from 'lucide-react';
 
 export default function HomeTab({ user, surveys, onStartSurvey, onNavigate }) {
   const topSurveys = surveys.slice(0, 3);
@@ -52,7 +52,7 @@ export default function HomeTab({ user, surveys, onStartSurvey, onNavigate }) {
       </div>
 
       {/* Quick Stats Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '16px' }}>
         <div style={{ background: 'var(--bg-card)', padding: '12px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-color)', textAlign: 'center' }}>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Today</div>
           <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--accent-green)', marginTop: '4px' }}>
@@ -73,6 +73,48 @@ export default function HomeTab({ user, surveys, onStartSurvey, onNavigate }) {
             {user?.stats?.surveysCompleted || 0} 🎯
           </div>
         </div>
+      </div>
+
+      {/* Leaderboard Callout Banner */}
+      <div
+        onClick={() => onNavigate('leaderboard')}
+        className="glass-card"
+        style={{
+          padding: '12px 14px',
+          marginBottom: '20px',
+          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(217, 119, 6, 0.2) 100%)',
+          border: '1px solid rgba(245, 158, 11, 0.4)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          borderRadius: '16px'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            width: '38px',
+            height: '38px',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 10px rgba(245, 158, 11, 0.4)'
+          }}>
+            <Trophy size={20} color="#000" />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>Top Earners Contest</span>
+              <span className="badge badge-gold" style={{ fontSize: '0.65rem', padding: '1px 6px' }}>LIVE</span>
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+              See top ranked survey earners & weekly prizes
+            </div>
+          </div>
+        </div>
+        <ChevronRight size={18} color="var(--accent-gold)" />
       </div>
 
       {/* Recommended Surveys Section */}

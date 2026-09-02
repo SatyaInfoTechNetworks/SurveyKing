@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Target, Wallet, User, Crown, Shield, Globe, Smartphone } from 'lucide-react';
+import { Home, Target, Wallet, User, Crown, Shield, Globe, Smartphone, Trophy } from 'lucide-react';
 import HomeTab from './components/HomeTab';
 import SurveysTab from './components/SurveysTab';
 import EarningsTab from './components/EarningsTab';
 import ProfileTab from './components/ProfileTab';
+import LeaderboardTab from './components/LeaderboardTab';
 import AdminLayout from './admin/layouts/AdminLayout';
 import LandingPage from './components/LandingPage';
 
@@ -261,6 +262,10 @@ export default function App() {
             />
           )}
 
+          {activeTab === 'leaderboard' && (
+            <LeaderboardTab user={user} />
+          )}
+
           {activeTab === 'earnings' && (
             <EarningsTab
               user={user}
@@ -289,7 +294,7 @@ export default function App() {
               className={`nav-item ${activeTab === 'home' ? 'active' : ''}`}
               onClick={() => setActiveTab('home')}
             >
-              <Home size={22} />
+              <Home size={20} />
               <span>Home</span>
             </button>
 
@@ -297,15 +302,23 @@ export default function App() {
               className={`nav-item ${activeTab === 'surveys' ? 'active' : ''}`}
               onClick={() => setActiveTab('surveys')}
             >
-              <Target size={22} />
+              <Target size={20} />
               <span>Surveys</span>
+            </button>
+
+            <button
+              className={`nav-item ${activeTab === 'leaderboard' ? 'active' : ''}`}
+              onClick={() => setActiveTab('leaderboard')}
+            >
+              <Trophy size={20} />
+              <span>Top</span>
             </button>
 
             <button
               className={`nav-item ${activeTab === 'earnings' ? 'active' : ''}`}
               onClick={() => setActiveTab('earnings')}
             >
-              <Wallet size={22} />
+              <Wallet size={20} />
               <span>Earnings</span>
             </button>
 
@@ -313,7 +326,7 @@ export default function App() {
               className={`nav-item ${activeTab === 'profile' ? 'active' : ''}`}
               onClick={() => setActiveTab('profile')}
             >
-              <User size={22} />
+              <User size={20} />
               <span>Profile</span>
             </button>
           </nav>
