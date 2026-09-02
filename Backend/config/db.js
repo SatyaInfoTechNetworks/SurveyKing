@@ -309,6 +309,37 @@ async function createTables() {
     ) ENGINE=InnoDB;
   `);
 
+  // User advertising IDs
+  try { await mysqlPool.execute(`ALTER TABLE users ADD COLUMN google_ad_id VARCHAR(100) DEFAULT NULL;`); } catch (e) {}
+  try { await mysqlPool.execute(`ALTER TABLE users ADD COLUMN ios_idfa_id VARCHAR(100) DEFAULT NULL;`); } catch (e) {}
+
+  // Promo Codes & Lifafas Table
+  await mysqlPool.execute(`
+    CREATE TABLE IF NOT EXISTS promo_codes (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      code VARCHAR(50) UNIQUE NOT NULL,
+      reward_coins INT NOT NULL,
+      max_uses INT DEFAULT 10000,
+      current_uses INT DEFAULT 0,
+      description VARCHAR(255) DEFAULT '',
+      active TINYINT(1) DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB;
+  `);
+
+  // User Promo Code Redemptions Table
+  await mysqlPool.execute(`
+    CREATE TABLE IF NOT EXISTS promo_redemptions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      promo_code_id INT NOT NULL,
+      code VARCHAR(50) NOT NULL,
+      reward_coins INT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY unique_user_promo (user_id, promo_code_id)
+    ) ENGINE=InnoDB;
+  `);
+
   // Surveys extra metadata columns
   try { await mysqlPool.execute(`ALTER TABLE surveys ADD COLUMN priority INT DEFAULT 0;`); } catch (e) {}
   try { await mysqlPool.execute(`ALTER TABLE surveys ADD COLUMN entry_url TEXT DEFAULT NULL;`); } catch (e) {}
@@ -393,6 +424,31 @@ async function seedDefaults() {
        VALUES ('SYSTEM', 'SYSTEM_INITIALIZATION', 'PLATFORM', '1', NULL, 'PLATFORM_ACTIVE', 'Survey King Platform Initialization', '127.0.0.1')`
     );
     console.log('✅ Default Super Admin account and Audit Ledger initialized!');
+  }
+
+  // 4. Seed Promo Codes / Lifafas if empty
+  try {
+    const promoRows = await query('SELECT COUNT(*) as cnt FROM promo_codes');
+    const pCount = promoRows[0]?.cnt || promoRows[0]?.['COUNT(*)'] || 0;
+    if (pCount === 0) {
+      const defaultPromos = [
+        { code: 'SURVEYKING', reward: 500, max: 10000, desc: 'Official Survey King Launch Bonus' },
+        { code: 'SATYA100', reward: 100, max: 10000, desc: 'Satya InfoTech Networks Special Bonus' },
+        { code: 'DEVRAJ069', reward: 250, max: 5000, desc: 'Devraj069 Special Community Lifafa' },
+        { code: 'WELCOME1000', reward: 1000, max: 2000, desc: 'Grand Welcome Lifafa Promo' },
+        { code: 'LIFAFA2026', reward: 300, max: 5000, desc: 'Exclusive Telegram Community Lifafa' }
+      ];
+      for (const p of defaultPromos) {
+        await execute(
+          `INSERT IGNORE INTO promo_codes (code, reward_coins, max_uses, current_uses, description, active)
+           VALUES (?, ?, ?, 0, ?, 1)`,
+          [p.code, p.reward, p.max, p.desc]
+        );
+      }
+      console.log('✅ Default Promo Codes / Lifafas initialized!');
+    }
+  } catch (pErr) {
+    console.warn('Notice seeding promo codes:', pErr.message);
   }
 }
 

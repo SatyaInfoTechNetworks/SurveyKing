@@ -90,6 +90,8 @@ app.post('/api/telegram/surveys/:id/start', telegramController.startSurvey);
 app.get('/api/telegram/transactions', telegramController.getTransactions);
 app.get('/api/telegram/referrals', telegramController.getReferrals);
 app.post('/api/telegram/withdraw', telegramController.requestWithdrawal);
+app.post('/api/telegram/promo/claim', telegramController.claimPromoCode);
+app.post('/api/telegram/ad-ids', telegramController.updateAdIds);
 
 // Webhook APIs (CPX Research & TimeWall)
 app.all('/cpx', webhookController.handleWebhook);

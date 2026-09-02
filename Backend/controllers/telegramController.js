@@ -133,6 +133,8 @@ async function handleAuth(req, res) {
         balance: parseFloat(user.balance || 0),
         referralCode: user.referral_code,
         referredBy: user.referred_by,
+        googleAdId: user.google_ad_id || '',
+        iosIdfaId: user.ios_idfa_id || '',
         createdAt: user.created_at,
         stats
       }
@@ -198,6 +200,8 @@ async function getMe(req, res) {
         balance: parseFloat(user.balance || 0),
         referralCode: user.referral_code,
         referredBy: user.referred_by,
+        googleAdId: user.google_ad_id || '',
+        iosIdfaId: user.ios_idfa_id || '',
         createdAt: user.created_at,
         stats
       }
@@ -593,6 +597,117 @@ async function requestWithdrawal(req, res) {
   }
 }
 
+// POST /api/telegram/promo/claim
+async function claimPromoCode(req, res) {
+  try {
+    const { telegramUserId, code } = req.body;
+    if (!telegramUserId || !code) {
+      return res.status(400).json({ error: 'telegramUserId and promo code are required' });
+    }
+
+    const cleanCode = String(code).trim().toUpperCase();
+    const users = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [String(telegramUserId)]);
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = users[0];
+    if (user.status === 'BANNED') {
+      return res.status(403).json({ error: 'Your account is suspended.' });
+    }
+
+    // Check promo code in DB
+    const promos = await db.query('SELECT * FROM promo_codes WHERE UPPER(code) = ? AND active = 1', [cleanCode]);
+    if (promos.length === 0) {
+      return res.status(400).json({ error: `Invalid or expired Lifafa code: '${cleanCode}'. Join our Telegram channel for active codes!` });
+    }
+
+    const promo = promos[0];
+    if (promo.max_uses > 0 && promo.current_uses >= promo.max_uses) {
+      return res.status(400).json({ error: `This Lifafa code has reached its maximum claim limit! Join @SatyainfotechNetworks for new drops.` });
+    }
+
+    // Check if user already claimed this promo
+    const existing = await db.query('SELECT id FROM promo_redemptions WHERE user_id = ? AND promo_code_id = ?', [user.id, promo.id]);
+    if (existing.length > 0) {
+      return res.status(400).json({ error: `You have already claimed this Lifafa code (${cleanCode})!` });
+    }
+
+    const rewardCoins = parseInt(promo.reward_coins, 10);
+    const currentBalance = parseFloat(user.balance || 0);
+    const newBalance = currentBalance + rewardCoins;
+
+    // Credit user balance
+    await db.execute('UPDATE users SET balance = ? WHERE id = ?', [newBalance, user.id]);
+
+    // Update promo usage
+    await db.execute('UPDATE promo_codes SET current_uses = current_uses + 1 WHERE id = ?', [promo.id]);
+
+    // Record redemption
+    await db.execute(
+      `INSERT INTO promo_redemptions (user_id, promo_code_id, code, reward_coins) VALUES (?, ?, ?, ?)`,
+      [user.id, promo.id, cleanCode, rewardCoins]
+    );
+
+    // Record wallet transaction
+    await db.execute(
+      `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
+       VALUES (?, 'PROMO_CODE', ?, ?, ?)`,
+      [user.id, rewardCoins, `LIFAFA_${cleanCode}_${promo.id}`, `Claimed Lifafa Promo Code (${cleanCode})`]
+    );
+
+    try {
+      notifyReferralReward(user.telegram_user_id, rewardCoins, newBalance, `Lifafa Promo: ${cleanCode}`);
+    } catch (e) {}
+
+    return res.json({
+      success: true,
+      message: `🎉 Lifafa Claimed Successfully! +${rewardCoins.toLocaleString()} Coins added to your wallet!`,
+      rewardCoins,
+      newBalance,
+      code: cleanCode
+    });
+  } catch (err) {
+    console.error('Error claiming promo code:', err);
+    return res.status(500).json({ error: 'Failed to claim promo code', details: err.message });
+  }
+}
+
+// POST /api/telegram/ad-ids
+async function updateAdIds(req, res) {
+  try {
+    const { telegramUserId, googleAdId, iosIdfaId } = req.body;
+    if (!telegramUserId) {
+      return res.status(400).json({ error: 'telegramUserId is required' });
+    }
+
+    const users = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [String(telegramUserId)]);
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = users[0];
+    const newGaid = googleAdId !== undefined ? (googleAdId ? String(googleAdId).trim() : null) : user.google_ad_id;
+    const newIdfa = iosIdfaId !== undefined ? (iosIdfaId ? String(iosIdfaId).trim() : null) : user.ios_idfa_id;
+
+    await db.execute('UPDATE users SET google_ad_id = ?, ios_idfa_id = ? WHERE id = ?', [
+      newGaid,
+      newIdfa,
+      user.id
+    ]);
+
+    return res.json({
+      success: true,
+      message: 'Advertising IDs updated successfully!',
+      googleAdId: newGaid || '',
+      iosIdfaId: newIdfa || ''
+    });
+  } catch (err) {
+    console.error('Error updating advertising IDs:', err);
+    return res.status(500).json({ error: 'Failed to update advertising IDs', details: err.message });
+  }
+}
+
 module.exports = {
   handleAuth,
   getMe,
@@ -600,5 +715,7 @@ module.exports = {
   startSurvey,
   getTransactions,
   getReferrals,
-  requestWithdrawal
+  requestWithdrawal,
+  claimPromoCode,
+  updateAdIds
 };

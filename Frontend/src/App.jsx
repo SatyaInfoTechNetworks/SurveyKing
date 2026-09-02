@@ -275,6 +275,11 @@ export default function App() {
               user={user}
               referrals={referrals}
               referralSettings={referralSettings}
+              onUserUpdate={() => {
+                if (user?.telegramUserId) {
+                  loadUserData(user.telegramUserId);
+                }
+              }}
             />
           )}
 
