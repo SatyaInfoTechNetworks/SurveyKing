@@ -753,16 +753,19 @@ async function getLeaderboard(req, res) {
       console.warn('Leaderboard query fallback:', dbErr.message);
     }
 
-    let leaderboardList = (topUsers || []).map((u, idx) => ({
-      rank: idx + 1,
-      id: u.id,
-      name: u.name || 'Survey User',
-      username: u.username ? `@${u.username}` : '@user',
-      totalEarnings: Math.round(parseFloat(u.total_earnings || 0)),
-      rupees: (parseFloat(u.total_earnings || 0) / 100).toFixed(0),
-      surveysCount: parseInt(u.surveys_count || 0, 10),
-      isCurrentUser: u.telegram_user_id === tgUserId
-    }));
+    let leaderboardList = (topUsers || []).map((u, idx) => {
+      const coins = Math.round(parseFloat(u.total_earnings || 0));
+      return {
+        rank: idx + 1,
+        id: u.id,
+        name: u.name || 'Survey User',
+        username: u.username ? `@${u.username}` : '@user',
+        totalEarnings: coins,
+        rupees: (coins / 100).toFixed(2),
+        surveysCount: parseInt(u.surveys_count || 0, 10),
+        isCurrentUser: u.telegram_user_id === tgUserId
+      };
+    });
 
     let currentUserRank = leaderboardList.find(u => u.isCurrentUser);
     if (!currentUserRank && tgUserId) {
@@ -805,7 +808,7 @@ async function getLeaderboard(req, res) {
           name: u.name,
           username: u.username ? `@${u.username}` : '@user',
           totalEarnings: Math.round(userEarnings),
-          rupees: (userEarnings / 100).toFixed(0),
+          rupees: (userEarnings / 100).toFixed(2),
           surveysCount: parseInt(compSurveys[0]?.cnt || 0, 10),
           isCurrentUser: true
         };
