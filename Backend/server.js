@@ -146,12 +146,16 @@ app.get('/api/admin/referrals/stats', adminController.getReferralsList);
 app.get('/api/admin/referral-settings', adminController.getReferralSettings);
 app.put('/api/admin/referral-settings', adminController.updateReferralSettings);
 
-// 8. Telegram Bot
+// 8. Telegram Bot & Broadcast Queue
 app.get('/api/admin/telegram/status', adminController.getTelegramStatus);
 app.post('/api/admin/telegram/broadcast', adminController.broadcastTelegram);
+app.get('/api/admin/telegram/broadcast-jobs', adminController.getBroadcastJobs);
+app.post('/api/admin/telegram/broadcast-jobs', adminController.createBroadcastJob);
+app.post('/api/admin/telegram/broadcast-jobs/:id/action', adminController.manageBroadcastJob);
 
 // 9. Fraud & Risk Center
 app.get('/api/admin/fraud', adminController.getFraudCenter);
+app.post('/api/admin/fraud/flags/:id/resolve', adminController.resolveFraudFlag);
 
 // 10. Analytics
 app.get('/api/admin/analytics', adminController.getAnalytics);

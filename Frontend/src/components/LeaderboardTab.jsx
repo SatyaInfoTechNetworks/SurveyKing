@@ -116,17 +116,44 @@ export default function LeaderboardTab({ user }) {
         ))}
       </div>
 
-      {/* Top 3 Podium */}
-      {leaderboard.length >= 3 && (
+      {/* Top Podium for Available Earners */}
+      {leaderboard.length === 0 ? (
+        <div className="glass-card" style={{
+          padding: '36px 20px',
+          textAlign: 'center',
+          background: 'rgba(15, 23, 42, 0.6)',
+          border: '1px solid rgba(245, 158, 11, 0.25)',
+          borderRadius: '20px'
+        }}>
+          <div style={{
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            background: 'rgba(245, 158, 11, 0.12)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 14px'
+          }}>
+            <Trophy size={30} color="var(--accent-gold)" />
+          </div>
+          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fff' }}>
+            Leaderboard is Heating Up! 🔥
+          </div>
+          <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '6px', maxWidth: '320px', margin: '6px auto 0' }}>
+            Complete quick surveys and earn instant Coins to claim the #1 Champion rank!
+          </div>
+        </div>
+      ) : (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1.15fr 1fr',
+          gridTemplateColumns: leaderboard.length === 1 ? '1fr' : (leaderboard.length === 2 ? '1.15fr 1fr' : '1fr 1.15fr 1fr'),
           gap: '8px',
           alignItems: 'flex-end',
           margin: '10px 0 6px 0'
         }}>
-          {/* #2 Silver */}
-          {top2 && (
+          {/* #2 Silver (if 3+ users) */}
+          {leaderboard.length >= 3 && top2 && (
             <div className="glass-card" style={{
               padding: '12px 8px',
               textAlign: 'center',
@@ -151,7 +178,7 @@ export default function LeaderboardTab({ user }) {
                   color: '#0f172a',
                   border: '2px solid #cbd5e1'
                 }}>
-                  {top2.name.charAt(0)}
+                  {top2.name ? top2.name.charAt(0).toUpperCase() : 'U'}
                 </div>
                 <div style={{
                   position: 'absolute',
@@ -174,7 +201,7 @@ export default function LeaderboardTab({ user }) {
               </div>
 
               <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
-                {top2.name.split(' ')[0]}
+                {top2.name ? top2.name.split(' ')[0] : 'User'}
               </div>
               <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{top2.username}</div>
 
@@ -199,7 +226,7 @@ export default function LeaderboardTab({ user }) {
               background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.2) 0%, rgba(15, 23, 42, 0.9) 100%)',
               border: '2px solid rgba(245, 158, 11, 0.6)',
               boxShadow: '0 8px 24px rgba(245, 158, 11, 0.25)',
-              transform: 'translateY(-6px)'
+              transform: leaderboard.length > 1 ? 'translateY(-6px)' : 'none'
             }}>
               <div style={{ position: 'relative', marginBottom: '8px' }}>
                 <Crown size={22} color="var(--accent-gold)" style={{ position: 'absolute', top: '-18px', left: '50%', transform: 'translateX(-50%)' }} />
@@ -217,7 +244,7 @@ export default function LeaderboardTab({ user }) {
                   border: '3px solid #fbbf24',
                   boxShadow: '0 4px 14px rgba(245, 158, 11, 0.4)'
                 }}>
-                  {top1.name.charAt(0)}
+                  {top1.name ? top1.name.charAt(0).toUpperCase() : 'U'}
                 </div>
                 <div style={{
                   position: 'absolute',
@@ -240,7 +267,7 @@ export default function LeaderboardTab({ user }) {
               </div>
 
               <div style={{ fontSize: '0.88rem', fontWeight: 900, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
-                {top1.name.split(' ')[0]}
+                {top1.name ? top1.name.split(' ')[0] : 'User'}
               </div>
               <div style={{ fontSize: '0.68rem', color: 'var(--accent-gold)' }}>{top1.username}</div>
 
@@ -253,8 +280,69 @@ export default function LeaderboardTab({ user }) {
             </div>
           )}
 
-          {/* #3 Bronze */}
-          {top3 && (
+          {/* #2 Silver (if 2 users only) or #3 Bronze (if 3+ users) */}
+          {leaderboard.length === 2 && top2 && (
+            <div className="glass-card" style={{
+              padding: '12px 8px',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              borderRadius: '18px',
+              background: 'linear-gradient(180deg, rgba(148, 163, 184, 0.12) 0%, rgba(15, 23, 42, 0.8) 100%)',
+              border: '1px solid rgba(148, 163, 184, 0.3)'
+            }}>
+              <div style={{ position: 'relative', marginBottom: '8px' }}>
+                <div style={{
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #cbd5e1 0%, #64748b 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: '1.2rem',
+                  color: '#0f172a',
+                  border: '2px solid #cbd5e1'
+                }}>
+                  {top2.name ? top2.name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <div style={{
+                  position: 'absolute',
+                  bottom: '-6px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: '#94a3b8',
+                  color: '#000',
+                  borderRadius: '50%',
+                  width: '18px',
+                  height: '18px',
+                  fontSize: '0.7rem',
+                  fontWeight: 900,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  2
+                </div>
+              </div>
+
+              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+                {top2.name ? top2.name.split(' ')[0] : 'User'}
+              </div>
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{top2.username}</div>
+
+              <div style={{ marginTop: '8px', fontSize: '0.85rem', fontWeight: 900, color: '#cbd5e1' }}>
+                {top2.totalEarnings.toLocaleString()} 🪙
+              </div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--accent-green)', fontWeight: 700 }}>
+                ₹{top2.rupees}
+              </div>
+            </div>
+          )}
+
+          {leaderboard.length >= 3 && top3 && (
             <div className="glass-card" style={{
               padding: '12px 8px',
               textAlign: 'center',
@@ -279,7 +367,7 @@ export default function LeaderboardTab({ user }) {
                   color: '#fff',
                   border: '2px solid #b45309'
                 }}>
-                  {top3.name.charAt(0)}
+                  {top3.name ? top3.name.charAt(0).toUpperCase() : 'U'}
                 </div>
                 <div style={{
                   position: 'absolute',
@@ -302,7 +390,7 @@ export default function LeaderboardTab({ user }) {
               </div>
 
               <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
-                {top3.name.split(' ')[0]}
+                {top3.name ? top3.name.split(' ')[0] : 'User'}
               </div>
               <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{top3.username}</div>
 
@@ -364,72 +452,74 @@ export default function LeaderboardTab({ user }) {
         </div>
       )}
 
-      {/* Ranked List (Rank 4 to 20) */}
-      <div className="glass-card" style={{ padding: '8px 12px' }}>
-        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '8px 6px', display: 'flex', justifyContent: 'space-between' }}>
-          <span>Rank & Participant</span>
-          <span>Coins Earned</span>
-        </div>
+      {/* Ranked List (Rank 4 to 20 or rest) */}
+      {restEarners.length > 0 && (
+        <div className="glass-card" style={{ padding: '8px 12px' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '8px 6px', display: 'flex', justifyContent: 'space-between' }}>
+            <span>Rank & Participant</span>
+            <span>Coins Earned</span>
+          </div>
 
-        {restEarners.map((item) => (
-          <div
-            key={item.id}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '12px 6px',
-              borderTop: '1px solid rgba(255, 255, 255, 0.05)'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
-              <div style={{
-                width: '28px',
-                fontSize: '0.85rem',
-                fontWeight: 800,
-                color: item.rank <= 10 ? 'var(--accent-gold)' : 'var(--text-muted)',
-                textAlign: 'center'
-              }}>
-                #{item.rank}
-              </div>
-
-              <div style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '12px',
-                background: 'rgba(255, 255, 255, 0.06)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+          {restEarners.map((item) => (
+            <div
+              key={item.id}
+              style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 800,
-                color: '#fff',
-                flexShrink: 0
-              }}>
-                {item.name.charAt(0)}
+                justifyContent: 'space-between',
+                padding: '12px 6px',
+                borderTop: '1px solid rgba(255, 255, 255, 0.05)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                <div style={{
+                  width: '28px',
+                  fontSize: '0.85rem',
+                  fontWeight: 800,
+                  color: item.rank <= 10 ? 'var(--accent-gold)' : 'var(--text-muted)',
+                  textAlign: 'center'
+                }}>
+                  #{item.rank}
+                </div>
+
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '12px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  color: '#fff',
+                  flexShrink: 0
+                }}>
+                  {item.name ? item.name.charAt(0).toUpperCase() : 'U'}
+                </div>
+
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {item.name}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                    {item.username} • {item.surveysCount} surveys
+                  </div>
+                </div>
               </div>
 
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {item.name}
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff' }}>
+                  {item.totalEarnings.toLocaleString()} 🪙
                 </div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                  {item.username} • {item.surveysCount} surveys
+                <div style={{ fontSize: '0.7rem', color: 'var(--accent-green)', fontWeight: 700 }}>
+                  ₹{item.rupees}
                 </div>
               </div>
             </div>
-
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff' }}>
-                {item.totalEarnings.toLocaleString()} 🪙
-              </div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--accent-green)', fontWeight: 700 }}>
-                ₹{item.rupees}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Community Contest CTA */}
       <div className="glass-card" style={{

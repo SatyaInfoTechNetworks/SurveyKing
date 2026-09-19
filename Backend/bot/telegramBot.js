@@ -8,8 +8,8 @@ function initBot() {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const webAppUrl = process.env.WEBAPP_URL || 'https://surveyking.satyainfotechnetworks.com';
 
-  if (!token || token.includes('SampleSurveyKingBotTokenMock')) {
-    console.log('ℹ️ Telegram Bot running in mock/demo mode (add real TELEGRAM_BOT_TOKEN to .env to connect to Telegram live).');
+  if (!token) {
+    console.log('ℹ️ TELEGRAM_BOT_TOKEN not provided in .env.');
     return;
   }
 

@@ -90,36 +90,44 @@ export default function SurveysPage({ liveSurveys, customSurveys, attempts, onCr
               </tr>
             </thead>
             <tbody>
-              {liveSurveys.map((s, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                  <td style={{ padding: '14px 18px' }}>
-                    <span style={{ fontWeight: 800, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>
-                      {s.provider}
-                    </span>
-                  </td>
-                  <td style={{ padding: '14px 18px', fontFamily: 'monospace', color: 'var(--text-secondary, #94a3b8)' }}>
-                    {s.surveyId}
-                  </td>
-                  <td style={{ padding: '14px 18px' }}>
-                    <div style={{ fontWeight: 700, color: '#fff' }}>{s.title}</div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)' }}>Category: {s.category}</div>
-                  </td>
-                  <td style={{ padding: '14px 18px', fontWeight: 800, color: '#f59e0b' }}>
-                    +{s.reward.toLocaleString()} 🪙
-                  </td>
-                  <td style={{ padding: '14px 18px', color: '#fff' }}>
-                    ⏱ {s.loi} mins
-                  </td>
-                  <td style={{ padding: '14px 18px', color: '#10b981', fontWeight: 700 }}>
-                    {s.conversionRate || '40%'}
-                  </td>
-                  <td style={{ padding: '14px 18px' }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '9999px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>
-                      {s.status}
-                    </span>
+              {liveSurveys.length === 0 ? (
+                <tr>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted, #64748b)' }}>
+                    No live partner surveys available right now. Surveys refresh automatically as inventory becomes available.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                liveSurveys.map((s, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                    <td style={{ padding: '14px 18px' }}>
+                      <span style={{ fontWeight: 800, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem' }}>
+                        {s.provider}
+                      </span>
+                    </td>
+                    <td style={{ padding: '14px 18px', fontFamily: 'monospace', color: 'var(--text-secondary, #94a3b8)' }}>
+                      {s.surveyId}
+                    </td>
+                    <td style={{ padding: '14px 18px' }}>
+                      <div style={{ fontWeight: 700, color: '#fff' }}>{s.title}</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)' }}>Category: {s.category}</div>
+                    </td>
+                    <td style={{ padding: '14px 18px', fontWeight: 800, color: '#f59e0b' }}>
+                      +{s.reward.toLocaleString()} 🪙
+                    </td>
+                    <td style={{ padding: '14px 18px', color: '#fff' }}>
+                      ⏱ {s.loi} mins
+                    </td>
+                    <td style={{ padding: '14px 18px', color: '#10b981', fontWeight: 700 }}>
+                      {s.conversionRate || '40%'}
+                    </td>
+                    <td style={{ padding: '14px 18px' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '2px 8px', borderRadius: '9999px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>
+                        {s.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

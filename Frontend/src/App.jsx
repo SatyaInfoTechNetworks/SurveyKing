@@ -33,7 +33,7 @@ export default function App() {
 
   // Initialize Telegram WebApp & Authenticate
   useEffect(() => {
-    let tgUser = { id: 123456789, first_name: 'Survey', last_name: 'King', username: 'surveyking_dev' };
+    let tgUser = null;
     let startParam = null;
 
     if (window.Telegram?.WebApp) {
@@ -45,6 +45,25 @@ export default function App() {
       }
       if (tg.initDataUnsafe?.start_param) {
         startParam = tg.initDataUnsafe.start_param;
+      }
+    }
+
+    if (!tgUser) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const paramTgId = urlParams.get('tgId') || urlParams.get('user_id') || urlParams.get('ext_user_id');
+      const paramRef = urlParams.get('start') || urlParams.get('ref') || startParam;
+
+      if (paramTgId) {
+        tgUser = { id: paramTgId, first_name: 'User', username: `tg_${paramTgId}` };
+        startParam = paramRef;
+      } else {
+        let storedId = localStorage.getItem('sk_tg_user_id');
+        if (!storedId) {
+          storedId = String(Math.floor(100000000 + Math.random() * 900000000));
+          localStorage.setItem('sk_tg_user_id', storedId);
+        }
+        tgUser = { id: storedId, first_name: 'Survey User', username: `user_${storedId.slice(-4)}` };
+        startParam = paramRef;
       }
     }
 
@@ -74,15 +93,6 @@ export default function App() {
       }
     } catch (err) {
       console.error('Authentication error:', err);
-      setUser({
-        id: 1,
-        telegramUserId: '123456789',
-        name: 'Demo King User',
-        username: 'demoking',
-        balance: 0,
-        referralCode: 'SK99887',
-        stats: { surveysCompleted: 0, todayEarnings: 0, weekEarnings: 0 }
-      });
     } finally {
       setLoading(false);
     }

@@ -761,19 +761,6 @@ async function getLeaderboard(req, res) {
       console.warn('Leaderboard query fallback:', dbErr.message);
     }
 
-    const sampleEarners = [
-      { name: 'Rahul Sharma', username: 'rahul_surveys', total_earnings: 285400, surveys_count: 84 },
-      { name: 'Aakash Verma', username: 'aakash_pro', total_earnings: 219800, surveys_count: 67 },
-      { name: 'Priya Patel', username: 'priya_p', total_earnings: 194500, surveys_count: 59 },
-      { name: 'Vikram Singh', username: 'vikram99', total_earnings: 168200, surveys_count: 48 },
-      { name: 'Sneha Roy', username: 'sneha_r', total_earnings: 142000, surveys_count: 41 },
-      { name: 'Devraj SIT', username: 'Devraj069', total_earnings: 135000, surveys_count: 38 },
-      { name: 'Ankit Gupta', username: 'ankit_g', total_earnings: 118400, surveys_count: 35 },
-      { name: 'Kavita Joshi', username: 'kavita_j', total_earnings: 98500, surveys_count: 29 },
-      { name: 'Rohan Mehta', username: 'rohan_m', total_earnings: 87200, surveys_count: 26 },
-      { name: 'Sanjay Kumar', username: 'sanjay_k', total_earnings: 74600, surveys_count: 21 }
-    ];
-
     let leaderboardList = (topUsers || []).map((u, idx) => ({
       rank: idx + 1,
       id: u.id,
@@ -785,42 +772,62 @@ async function getLeaderboard(req, res) {
       isCurrentUser: u.telegram_user_id === tgUserId
     }));
 
-    if (leaderboardList.length < 5) {
-      const multiplier = period === 'today' ? 0.08 : (period === 'weekly' ? 0.35 : 1);
-      const combined = [...leaderboardList];
-      
-      sampleEarners.forEach((s) => {
-        if (!combined.some(c => c.username === `@${s.username}`)) {
-          combined.push({
-            id: 'sample_' + s.username,
-            name: s.name,
-            username: `@${s.username}`,
-            totalEarnings: Math.round(s.total_earnings * multiplier),
-            rupees: ((s.total_earnings * multiplier) / 100).toFixed(0),
-            surveysCount: Math.max(1, Math.round(s.surveys_count * multiplier)),
-            isCurrentUser: false
-          });
-        }
-      });
-
-      combined.sort((a, b) => b.totalEarnings - a.totalEarnings);
-      leaderboardList = combined.map((item, idx) => ({ ...item, rank: idx + 1 }));
-    }
-
     let currentUserRank = leaderboardList.find(u => u.isCurrentUser);
     if (!currentUserRank && tgUserId) {
       const userRows = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [tgUserId]);
       if (userRows.length > 0) {
         const u = userRows[0];
-        const bal = parseFloat(u.balance || 0);
+        let userEarnings = 0;
+        if (period === 'all') {
+          userEarnings = parseFloat(u.balance || 0);
+        } else {
+          const userPeriodTx = await db.query(
+            `SELECT COALESCE(SUM(amount), 0) as total FROM wallet_transactions wt 
+             WHERE wt.user_id = ? AND wt.type != 'WITHDRAWAL' ${dateFilter}`,
+            [u.id]
+          );
+          userEarnings = parseFloat(userPeriodTx[0]?.total || 0);
+        }
+
+        const compSurveys = await db.query(
+          `SELECT COUNT(*) as cnt FROM survey_participations WHERE user_id = ? AND status = 'COMPLETED'`,
+          [u.id]
+        );
+
+        let rankHigher = 0;
+        try {
+          if (period === 'all') {
+            const rCount = await db.query(
+              `SELECT COUNT(*) as cnt FROM users WHERE balance > ? AND status = 'ACTIVE'`,
+              [userEarnings]
+            );
+            rankHigher = rCount[0]?.cnt || 0;
+          } else {
+            const rCount = await db.query(
+              `SELECT COUNT(*) as cnt FROM (
+                SELECT wt.user_id, SUM(wt.amount) as total
+                FROM wallet_transactions wt
+                JOIN users us ON wt.user_id = us.id
+                WHERE wt.type != 'WITHDRAWAL' AND us.status = 'ACTIVE' ${dateFilter}
+                GROUP BY wt.user_id
+                HAVING total > ?
+              ) as t`,
+              [userEarnings]
+            );
+            rankHigher = rCount[0]?.cnt || 0;
+          }
+        } catch (rErr) {
+          rankHigher = leaderboardList.filter(l => l.totalEarnings > userEarnings).length;
+        }
+
         currentUserRank = {
-          rank: leaderboardList.filter(l => l.totalEarnings > bal).length + 1,
+          rank: rankHigher + 1,
           id: u.id,
           name: u.name,
           username: u.username ? `@${u.username}` : '@user',
-          totalEarnings: Math.round(bal),
-          rupees: (bal / 100).toFixed(0),
-          surveysCount: u.stats?.surveysCompleted || 0,
+          totalEarnings: Math.round(userEarnings),
+          rupees: (userEarnings / 100).toFixed(0),
+          surveysCount: parseInt(compSurveys[0]?.cnt || 0, 10),
           isCurrentUser: true
         };
       }
@@ -830,7 +837,7 @@ async function getLeaderboard(req, res) {
       success: true,
       period,
       leaderboard: leaderboardList.slice(0, 20),
-      currentUserRank: currentUserRank || { rank: 18, totalEarnings: 0, rupees: '0', surveysCount: 0, isCurrentUser: true }
+      currentUserRank: currentUserRank || null
     });
   } catch (err) {
     console.error('Error in getLeaderboard:', err);

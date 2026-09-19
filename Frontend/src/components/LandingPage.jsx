@@ -229,7 +229,7 @@ export default function LandingPage({ onLaunchApp }) {
               }}
             >
               <Crown size={16} color="var(--accent-gold)" />
-              <span>Launch Web Demo App</span>
+              <span>Open Survey App</span>
             </button>
           </div>
 
