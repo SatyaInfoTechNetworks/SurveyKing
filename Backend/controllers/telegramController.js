@@ -844,7 +844,14 @@ async function getStreakStatus(req, res) {
 
     const user = userRows[0];
     const settingsRows = await db.query('SELECT * FROM platform_settings WHERE id = 1');
-    const settings = settingsRows[0] || { adsgram_block_id: '46060', streak_reward_coins: 100 };
+    const settings = settingsRows[0] || { adsgram_block_id: '46060', streak_reward_coins: 100, streak_rewards_json: '[100, 150, 200, 250, 300, 400, 500]' };
+
+    let rewardsArray = [100, 150, 200, 250, 300, 400, 500];
+    try {
+      if (settings.streak_rewards_json) {
+        rewardsArray = JSON.parse(settings.streak_rewards_json);
+      }
+    } catch (e) {}
 
     const streakRows = await db.query('SELECT * FROM user_daily_streaks WHERE user_id = ?', [user.id]);
     let currentStreak = 0;
@@ -873,10 +880,9 @@ async function getStreakStatus(req, res) {
       }
     }
 
-    const rewardBase = parseInt(settings.streak_reward_coins || 100, 10);
     const days = [1, 2, 3, 4, 5, 6, 7].map(d => ({
       day: d,
-      reward: Math.round(rewardBase * (1 + ((d - 1) * 0.25))),
+      reward: parseInt(rewardsArray[d - 1] || (100 * d), 10),
       claimed: d <= effectiveStreak && !canClaim ? true : (d < effectiveStreak ? true : false),
       isCurrent: d === (canClaim ? (effectiveStreak >= 7 ? 1 : effectiveStreak + 1) : effectiveStreak)
     }));
@@ -888,7 +894,7 @@ async function getStreakStatus(req, res) {
         canClaimToday: canClaim,
         lastClaimedDate: lastClaimed,
         adsgramBlockId: settings.adsgram_block_id || '46060',
-        rewardBaseCoins: rewardBase,
+        rewardBaseCoins: rewardsArray[0] || 100,
         days
       }
     });
@@ -909,7 +915,14 @@ async function claimStreakAd(req, res) {
 
     const user = userRows[0];
     const settingsRows = await db.query('SELECT * FROM platform_settings WHERE id = 1');
-    const rewardBase = parseInt(settingsRows[0]?.streak_reward_coins || 100, 10);
+    const settings = settingsRows[0] || { adsgram_block_id: '46060', streak_reward_coins: 100, streak_rewards_json: '[100, 150, 200, 250, 300, 400, 500]' };
+
+    let rewardsArray = [100, 150, 200, 250, 300, 400, 500];
+    try {
+      if (settings.streak_rewards_json) {
+        rewardsArray = JSON.parse(settings.streak_rewards_json);
+      }
+    } catch (e) {}
 
     let streakRows = await db.query('SELECT * FROM user_daily_streaks WHERE user_id = ?', [user.id]);
     let currentStreak = 0;
@@ -942,8 +955,7 @@ async function claimStreakAd(req, res) {
       }
     }
 
-    const multiplier = 1 + ((newStreak - 1) * 0.25);
-    const rewardCoins = Math.round(rewardBase * multiplier);
+    const rewardCoins = parseInt(rewardsArray[newStreak - 1] || (100 * newStreak), 10);
 
     if (streakRows.length > 0) {
       await db.execute('UPDATE user_daily_streaks SET current_streak = ?, last_claimed_date = ? WHERE user_id = ?', [newStreak, todayStr, user.id]);

@@ -7,17 +7,38 @@ export default function ReferralsPage({ referrals, stats, settings, onSaveSettin
   const [minSurveyCoins, setMinSurveyCoins] = useState(settings?.minSurveyRewardCoins || 100);
   const [trigger, setTrigger] = useState(settings?.referralTrigger || 'FIRST_SURVEY');
   const [adsgramBlockId, setAdsgramBlockId] = useState(settings?.adsgramBlockId || '46060');
-  const [streakCoins, setStreakCoins] = useState(settings?.streakRewardCoins || 100);
+  const defaultDays = settings?.streakRewardsJson && Array.isArray(settings.streakRewardsJson) 
+    ? settings.streakRewardsJson 
+    : [100, 150, 200, 250, 300, 400, 500];
+
+  const [day1Coins, setDay1Coins] = useState(defaultDays[0] || 100);
+  const [day2Coins, setDay2Coins] = useState(defaultDays[1] || 150);
+  const [day3Coins, setDay3Coins] = useState(defaultDays[2] || 200);
+  const [day4Coins, setDay4Coins] = useState(defaultDays[3] || 250);
+  const [day5Coins, setDay5Coins] = useState(defaultDays[4] || 300);
+  const [day6Coins, setDay6Coins] = useState(defaultDays[5] || 400);
+  const [day7Coins, setDay7Coins] = useState(defaultDays[6] || 500);
 
   const handleRulesSubmit = (e) => {
     e.preventDefault();
+    const rewardsArray = [
+      parseInt(day1Coins, 10) || 100,
+      parseInt(day2Coins, 10) || 150,
+      parseInt(day3Coins, 10) || 200,
+      parseInt(day4Coins, 10) || 250,
+      parseInt(day5Coins, 10) || 300,
+      parseInt(day6Coins, 10) || 400,
+      parseInt(day7Coins, 10) || 500
+    ];
+
     onSaveSettings({
       referrerRewardCoins: parseInt(referrerCoins, 10),
       refereeRewardCoins: parseInt(refereeCoins, 10),
       minSurveyRewardCoins: parseInt(minSurveyCoins, 10),
       referralTrigger: trigger,
       adsgramBlockId: String(adsgramBlockId).trim(),
-      streakRewardCoins: parseInt(streakCoins, 10)
+      streakRewardCoins: parseInt(day1Coins, 10) || 100,
+      streakRewardsJson: rewardsArray
     });
   };
 
@@ -201,27 +222,62 @@ export default function ReferralsPage({ referrals, stats, settings, onSaveSettin
               </div>
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#f59e0b', marginBottom: '4px' }}>
-                🔥 Daily Streak Base Reward (Coins)
+            <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '12px', marginTop: '4px' }}>
+              <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 800, color: '#f59e0b', marginBottom: '8px' }}>
+                🔥 7-Day Daily Streak Rewards (Coins per Day)
               </label>
-              <input
-                type="number"
-                value={streakCoins}
-                onChange={(e) => setStreakCoins(e.target.value)}
-                style={{
-                  width: '100%',
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  borderRadius: '8px',
-                  padding: '9px 12px',
-                  color: '#f59e0b',
-                  fontWeight: 800,
-                  fontSize: '0.85rem'
-                }}
-              />
-              <div style={{ fontSize: '0.68rem', color: '#10b981', marginTop: '2px' }}>
-                Day 1: {streakCoins} 🪙 | Day 7: {Math.round(streakCoins * 2.25)} 🪙
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                {[
+                  { label: 'Day 1', value: day1Coins, setter: setDay1Coins },
+                  { label: 'Day 2', value: day2Coins, setter: setDay2Coins },
+                  { label: 'Day 3', value: day3Coins, setter: setDay3Coins },
+                  { label: 'Day 4', value: day4Coins, setter: setDay4Coins },
+                  { label: 'Day 5', value: day5Coins, setter: setDay5Coins },
+                  { label: 'Day 6', value: day6Coins, setter: setDay6Coins }
+                ].map(item => (
+                  <div key={item.label}>
+                    <label style={{ display: 'block', fontSize: '0.68rem', color: 'var(--text-muted, #64748b)', marginBottom: '2px' }}>
+                      {item.label} (Coins)
+                    </label>
+                    <input
+                      type="number"
+                      value={item.value}
+                      onChange={(e) => item.setter(e.target.value)}
+                      style={{
+                        width: '100%',
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        borderRadius: '6px',
+                        padding: '6px 8px',
+                        color: '#f59e0b',
+                        fontWeight: 800,
+                        fontSize: '0.8rem'
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ marginTop: '8px' }}>
+                <label style={{ display: 'block', fontSize: '0.68rem', color: '#10b981', fontWeight: 700, marginBottom: '2px' }}>
+                  👑 Day 7 Grand Jackpot (Coins)
+                </label>
+                <input
+                  type="number"
+                  value={day7Coins}
+                  onChange={(e) => setDay7Coins(e.target.value)}
+                  style={{
+                    width: '100%',
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    borderRadius: '6px',
+                    padding: '8px',
+                    color: '#10b981',
+                    fontWeight: 900,
+                    fontSize: '0.85rem'
+                  }}
+                />
               </div>
             </div>
 

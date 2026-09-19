@@ -197,6 +197,7 @@ async function createTables() {
       min_withdrawal_coins INT DEFAULT 2500,
       adsgram_block_id VARCHAR(100) DEFAULT '46060',
       streak_reward_coins INT DEFAULT 100,
+      streak_rewards_json VARCHAR(255) DEFAULT '[100, 150, 200, 250, 300, 400, 500]',
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB;
   `);
@@ -205,6 +206,7 @@ async function createTables() {
   try { await mysqlPool.execute(`ALTER TABLE platform_settings ADD COLUMN min_withdrawal_coins INT DEFAULT 2500;`); } catch (e) {}
   try { await mysqlPool.execute(`ALTER TABLE platform_settings ADD COLUMN adsgram_block_id VARCHAR(100) DEFAULT '46060';`); } catch (e) {}
   try { await mysqlPool.execute(`ALTER TABLE platform_settings ADD COLUMN streak_reward_coins INT DEFAULT 100;`); } catch (e) {}
+  try { await mysqlPool.execute(`ALTER TABLE platform_settings ADD COLUMN streak_rewards_json VARCHAR(255) DEFAULT '[100, 150, 200, 250, 300, 400, 500]';`); } catch (e) {}
 
   await mysqlPool.execute(`
     CREATE TABLE IF NOT EXISTS user_daily_streaks (
