@@ -6,6 +6,8 @@ export default function ReferralsPage({ referrals, stats, settings, onSaveSettin
   const [refereeCoins, setRefereeCoins] = useState(settings?.refereeRewardCoins || 500);
   const [minSurveyCoins, setMinSurveyCoins] = useState(settings?.minSurveyRewardCoins || 100);
   const [trigger, setTrigger] = useState(settings?.referralTrigger || 'FIRST_SURVEY');
+  const [adsgramBlockId, setAdsgramBlockId] = useState(settings?.adsgramBlockId || '46060');
+  const [streakCoins, setStreakCoins] = useState(settings?.streakRewardCoins || 100);
 
   const handleRulesSubmit = (e) => {
     e.preventDefault();
@@ -13,7 +15,9 @@ export default function ReferralsPage({ referrals, stats, settings, onSaveSettin
       referrerRewardCoins: parseInt(referrerCoins, 10),
       refereeRewardCoins: parseInt(refereeCoins, 10),
       minSurveyRewardCoins: parseInt(minSurveyCoins, 10),
-      referralTrigger: trigger
+      referralTrigger: trigger,
+      adsgramBlockId: String(adsgramBlockId).trim(),
+      streakRewardCoins: parseInt(streakCoins, 10)
     });
   };
 
@@ -170,6 +174,55 @@ export default function ReferralsPage({ referrals, stats, settings, onSaveSettin
                 <option value="FIRST_SURVEY">FIRST_SURVEY (Recommended: Must Complete Survey)</option>
                 <option value="ON_JOIN">ON_JOIN (Instant on registration)</option>
               </select>
+            </div>
+
+            <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '12px', marginTop: '4px' }}>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#38bdf8', marginBottom: '4px' }}>
+                📺 Adsgram Block ID (Video Ads)
+              </label>
+              <input
+                type="text"
+                value={adsgramBlockId}
+                onChange={(e) => setAdsgramBlockId(e.target.value)}
+                placeholder="e.g. 46060"
+                style={{
+                  width: '100%',
+                  background: 'rgba(56, 189, 248, 0.05)',
+                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                  borderRadius: '8px',
+                  padding: '9px 12px',
+                  color: '#38bdf8',
+                  fontWeight: 800,
+                  fontSize: '0.85rem'
+                }}
+              />
+              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted, #64748b)', marginTop: '4px' }}>
+                Adsgram unit ID for Telegram Mini App reward ads
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#f59e0b', marginBottom: '4px' }}>
+                🔥 Daily Streak Base Reward (Coins)
+              </label>
+              <input
+                type="number"
+                value={streakCoins}
+                onChange={(e) => setStreakCoins(e.target.value)}
+                style={{
+                  width: '100%',
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  borderRadius: '8px',
+                  padding: '9px 12px',
+                  color: '#f59e0b',
+                  fontWeight: 800,
+                  fontSize: '0.85rem'
+                }}
+              />
+              <div style={{ fontSize: '0.68rem', color: '#10b981', marginTop: '2px' }}>
+                Day 1: {streakCoins} 🪙 | Day 7: {Math.round(streakCoins * 2.25)} 🪙
+              </div>
             </div>
 
             <button

@@ -195,12 +195,26 @@ async function createTables() {
       referral_trigger VARCHAR(50) DEFAULT 'FIRST_SURVEY',
       min_survey_reward_coins INT DEFAULT 100,
       min_withdrawal_coins INT DEFAULT 2500,
+      adsgram_block_id VARCHAR(100) DEFAULT '46060',
+      streak_reward_coins INT DEFAULT 100,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB;
   `);
 
   try { await mysqlPool.execute(`ALTER TABLE platform_settings ADD COLUMN min_survey_reward_coins INT DEFAULT 100;`); } catch (e) {}
   try { await mysqlPool.execute(`ALTER TABLE platform_settings ADD COLUMN min_withdrawal_coins INT DEFAULT 2500;`); } catch (e) {}
+  try { await mysqlPool.execute(`ALTER TABLE platform_settings ADD COLUMN adsgram_block_id VARCHAR(100) DEFAULT '46060';`); } catch (e) {}
+  try { await mysqlPool.execute(`ALTER TABLE platform_settings ADD COLUMN streak_reward_coins INT DEFAULT 100;`); } catch (e) {}
+
+  await mysqlPool.execute(`
+    CREATE TABLE IF NOT EXISTS user_daily_streaks (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT UNIQUE NOT NULL,
+      current_streak INT DEFAULT 0,
+      last_claimed_date DATE DEFAULT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB;
+  `);
 
   // Check if payout_methods has method_id column, recreate if outdated
   try {

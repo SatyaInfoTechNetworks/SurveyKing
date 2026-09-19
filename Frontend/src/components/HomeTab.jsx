@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sparkles, TrendingUp, ShieldCheck, Play, ArrowRight, Zap, Coins, Clock, Trophy, ChevronRight } from 'lucide-react';
+import DailyStreakCard from './DailyStreakCard';
 
 export default function HomeTab({ user, surveys, onStartSurvey, onNavigate }) {
   const topSurveys = surveys.slice(0, 3);
@@ -50,6 +51,9 @@ export default function HomeTab({ user, surveys, onStartSurvey, onNavigate }) {
           </button>
         </div>
       </div>
+
+      {/* 7-Day Daily Streak Adsgram Card */}
+      <DailyStreakCard user={user} />
 
       {/* Quick Stats Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '16px' }}>

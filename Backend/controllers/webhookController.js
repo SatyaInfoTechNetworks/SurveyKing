@@ -445,7 +445,119 @@ async function handleTimeWallWebhook(req, res) {
   }
 }
 
+// -------------------------------------------------------------------
+// 3. ADSGRAM REWARD WEBHOOK ENDPOINT
+// GET /api/webhooks/adsgram?userid=[userid]
+// -------------------------------------------------------------------
+async function handleAdsgramWebhook(req, res) {
+  const startTime = Date.now();
+  const clientIp = req.clientIp || '127.0.0.1';
+  const tgUserId = req.query.userid || req.query.user_id || req.query.telegramUserId;
+
+  console.log(`📺 [ADSGRAM WEBHOOK] Incoming Reward GET Request for Telegram User ID: ${tgUserId}`);
+
+  if (!tgUserId) {
+    return res.status(400).send('MISSING_USER_ID');
+  }
+
+  try {
+    const userRows = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [String(tgUserId)]);
+    if (userRows.length === 0) {
+      console.warn(`⚠️ Adsgram Webhook: User with Telegram ID ${tgUserId} not found.`);
+      return res.status(404).send('USER_NOT_FOUND');
+    }
+
+    const user = userRows[0];
+
+    // Fetch dynamic streak reward amount from platform_settings
+    const settingsRows = await db.query('SELECT * FROM platform_settings WHERE id = 1');
+    const rewardBase = parseInt(settingsRows[0]?.streak_reward_coins || 100, 10);
+
+    // Fetch or initialize user streak
+    let streakRows = await db.query('SELECT * FROM user_daily_streaks WHERE user_id = ?', [user.id]);
+    let currentStreak = 0;
+    let lastClaimed = null;
+
+    if (streakRows.length > 0) {
+      currentStreak = streakRows[0].current_streak || 0;
+      lastClaimed = streakRows[0].last_claimed_date;
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    let newStreak = 1;
+    if (lastClaimed) {
+      const lastClaimedStr = new Date(lastClaimed).toISOString().split('T')[0];
+      if (lastClaimedStr === todayStr) {
+        // Already claimed today!
+        console.log(`ℹ️ Adsgram Webhook: User ${user.id} already claimed daily streak today.`);
+        return res.status(200).send('ALREADY_CLAIMED_TODAY');
+      } else if (lastClaimedStr === yesterdayStr) {
+        // Continuous streak increment (up to 7 days max then loop/continue)
+        newStreak = (currentStreak >= 7) ? 1 : currentStreak + 1;
+      } else {
+        // Missed a day! Reset streak back to Day 1
+        newStreak = 1;
+      }
+    }
+
+    // Dynamic reward scaling (Day 1: 1x, Day 7: 2.5x bonus)
+    const multiplier = 1 + ((newStreak - 1) * 0.25);
+    const rewardCoins = Math.round(rewardBase * multiplier);
+
+    // Update streak table
+    if (streakRows.length > 0) {
+      await db.execute(
+        'UPDATE user_daily_streaks SET current_streak = ?, last_claimed_date = ? WHERE user_id = ?',
+        [newStreak, todayStr, user.id]
+      );
+    } else {
+      await db.execute(
+        'INSERT INTO user_daily_streaks (user_id, current_streak, last_claimed_date) VALUES (?, ?, ?)',
+        [user.id, newStreak, todayStr]
+      );
+    }
+
+    // Credit coins to user wallet
+    const newBalance = parseFloat(user.balance || 0) + rewardCoins;
+    await db.execute('UPDATE users SET balance = ? WHERE id = ?', [newBalance, user.id]);
+
+    // Record wallet transaction
+    await db.execute(
+      `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
+       VALUES (?, 'STREAK_REWARD', ?, ?, ?)`,
+      [user.id, rewardCoins, `ADSGRAM_STREAK_D${newStreak}_${Date.now()}`, `Daily Streak Day ${newStreak} (Adsgram Reward)`]
+    );
+
+    await logPostback({
+      provider: 'Adsgram',
+      transId: `adsgram_${Date.now()}`,
+      tgUserId: user.telegram_user_id,
+      offerId: `Daily_Streak_Day_${newStreak}`,
+      statusParam: 'COMPLETED',
+      rawStatus: 'REWARD_EVENT',
+      amountLocal: rewardCoins,
+      amountUsd: 0.05,
+      clientIp,
+      idempotencyStatus: 'SUCCESS',
+      errorReason: null,
+      walletCredited: 1,
+      startTime
+    });
+
+    console.log(`✅ Adsgram Reward Credited: +${rewardCoins} Coins to User ${user.name} (Streak: Day ${newStreak})!`);
+    return res.status(200).send('OK');
+  } catch (err) {
+    console.error('💥 Error handling Adsgram webhook:', err);
+    return res.status(500).send('SERVER_ERROR');
+  }
+}
+
 module.exports = {
   handleWebhook,
-  handleTimeWallWebhook
+  handleTimeWallWebhook,
+  handleAdsgramWebhook
 };
