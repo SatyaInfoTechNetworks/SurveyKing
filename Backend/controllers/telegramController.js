@@ -367,6 +367,16 @@ async function getSurveys(req, res) {
 
     const allSurveys = [...liveCpxSurveys, ...liveTimeWallSurveys, ...formattedCustom];
 
+    // Sort combined surveys: High conversion rate first, then high reward amount first
+    allSurveys.sort((a, b) => {
+      const convA = parseFloat(String(a.conversionRate || '0').replace('%', '')) || 0;
+      const convB = parseFloat(String(b.conversionRate || '0').replace('%', '')) || 0;
+      if (convB !== convA) {
+        return convB - convA;
+      }
+      return parseFloat(b.reward || 0) - parseFloat(a.reward || 0);
+    });
+
     return res.json({
       success: true,
       surveys: allSurveys
@@ -723,40 +733,22 @@ async function getLeaderboard(req, res) {
 
     let topUsers = [];
     try {
-      if (period === 'all') {
-        topUsers = await db.query(`
-          SELECT 
-            u.id, 
-            u.telegram_user_id, 
-            u.name, 
-            u.username, 
-            u.balance as total_earnings,
-            COUNT(DISTINCT sp.id) as surveys_count
-          FROM users u
-          LEFT JOIN survey_participations sp ON sp.user_id = u.id AND sp.status = 'COMPLETED'
-          WHERE u.status = 'ACTIVE'
-          GROUP BY u.id
-          ORDER BY total_earnings DESC
-          LIMIT 25
-        `);
-      } else {
-        topUsers = await db.query(`
-          SELECT 
-            u.id, 
-            u.telegram_user_id, 
-            u.name, 
-            u.username, 
-            COALESCE(SUM(wt.amount), 0) as total_earnings,
-            COUNT(DISTINCT sp.id) as surveys_count
-          FROM users u
-          JOIN wallet_transactions wt ON wt.user_id = u.id AND wt.type != 'WITHDRAWAL' ${dateFilter}
-          LEFT JOIN survey_participations sp ON sp.user_id = u.id AND sp.status = 'COMPLETED'
-          WHERE u.status = 'ACTIVE'
-          GROUP BY u.id
-          ORDER BY total_earnings DESC
-          LIMIT 25
-        `);
-      }
+      topUsers = await db.query(`
+        SELECT 
+          u.id, 
+          u.telegram_user_id, 
+          u.name, 
+          u.username, 
+          COALESCE(SUM(wt.amount), 0) as total_earnings,
+          COUNT(DISTINCT sp.id) as surveys_count
+        FROM users u
+        JOIN wallet_transactions wt ON wt.user_id = u.id AND wt.type NOT IN ('WELCOME_BONUS', 'SIGNUP_BONUS', 'WITHDRAWAL', 'WITHDRAWAL_REFUND', 'ADMIN_ADJUSTMENT') ${dateFilter}
+        LEFT JOIN survey_participations sp ON sp.user_id = u.id AND sp.status = 'COMPLETED'
+        WHERE u.status = 'ACTIVE'
+        GROUP BY u.id
+        ORDER BY total_earnings DESC
+        LIMIT 25
+      `);
     } catch (dbErr) {
       console.warn('Leaderboard query fallback:', dbErr.message);
     }
@@ -777,17 +769,12 @@ async function getLeaderboard(req, res) {
       const userRows = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [tgUserId]);
       if (userRows.length > 0) {
         const u = userRows[0];
-        let userEarnings = 0;
-        if (period === 'all') {
-          userEarnings = parseFloat(u.balance || 0);
-        } else {
-          const userPeriodTx = await db.query(
-            `SELECT COALESCE(SUM(amount), 0) as total FROM wallet_transactions wt 
-             WHERE wt.user_id = ? AND wt.type != 'WITHDRAWAL' ${dateFilter}`,
-            [u.id]
-          );
-          userEarnings = parseFloat(userPeriodTx[0]?.total || 0);
-        }
+        const userPeriodTx = await db.query(
+          `SELECT COALESCE(SUM(amount), 0) as total FROM wallet_transactions wt 
+           WHERE wt.user_id = ? AND wt.type NOT IN ('WELCOME_BONUS', 'SIGNUP_BONUS', 'WITHDRAWAL', 'WITHDRAWAL_REFUND', 'ADMIN_ADJUSTMENT') ${dateFilter}`,
+          [u.id]
+        );
+        const userEarnings = parseFloat(userPeriodTx[0]?.total || 0);
 
         const compSurveys = await db.query(
           `SELECT COUNT(*) as cnt FROM survey_participations WHERE user_id = ? AND status = 'COMPLETED'`,
@@ -796,26 +783,18 @@ async function getLeaderboard(req, res) {
 
         let rankHigher = 0;
         try {
-          if (period === 'all') {
-            const rCount = await db.query(
-              `SELECT COUNT(*) as cnt FROM users WHERE balance > ? AND status = 'ACTIVE'`,
-              [userEarnings]
-            );
-            rankHigher = rCount[0]?.cnt || 0;
-          } else {
-            const rCount = await db.query(
-              `SELECT COUNT(*) as cnt FROM (
-                SELECT wt.user_id, SUM(wt.amount) as total
-                FROM wallet_transactions wt
-                JOIN users us ON wt.user_id = us.id
-                WHERE wt.type != 'WITHDRAWAL' AND us.status = 'ACTIVE' ${dateFilter}
-                GROUP BY wt.user_id
-                HAVING total > ?
-              ) as t`,
-              [userEarnings]
-            );
-            rankHigher = rCount[0]?.cnt || 0;
-          }
+          const rCount = await db.query(
+            `SELECT COUNT(*) as cnt FROM (
+              SELECT wt.user_id, SUM(wt.amount) as total
+              FROM wallet_transactions wt
+              JOIN users us ON wt.user_id = us.id
+              WHERE wt.type NOT IN ('WELCOME_BONUS', 'SIGNUP_BONUS', 'WITHDRAWAL', 'WITHDRAWAL_REFUND', 'ADMIN_ADJUSTMENT') AND us.status = 'ACTIVE' ${dateFilter}
+              GROUP BY wt.user_id
+              HAVING total > ?
+            ) as t`,
+            [userEarnings]
+          );
+          rankHigher = rCount[0]?.cnt || 0;
         } catch (rErr) {
           rankHigher = leaderboardList.filter(l => l.totalEarnings > userEarnings).length;
         }

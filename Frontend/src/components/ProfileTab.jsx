@@ -315,6 +315,52 @@ export default function ProfileTab({ user, referrals = [], referralSettings, onU
         </div>
       </div>
 
+      {/* Refer & Earn Banner Card (Positioned right below Profile Details) */}
+      <div className="glass-card" style={{ border: '1px solid rgba(245, 158, 11, 0.4)', background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(217, 119, 6, 0.12) 100%)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Gift size={20} color="var(--accent-gold)" />
+            <span style={{ fontSize: '1rem', fontWeight: 800, color: '#fff' }}>Refer & Earn {referrerCoins.toLocaleString()} 🪙</span>
+          </div>
+          <span className="badge badge-gold">
+            ₹{(referrerCoins / 100).toFixed(0)} / Friend
+          </span>
+        </div>
+
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px', lineHeight: '1.4' }}>
+          Earn <strong style={{ color: 'var(--accent-gold)' }}>{referrerCoins.toLocaleString()} Coins</strong> for every friend you invite! They receive <strong style={{ color: 'var(--accent-green)' }}>{refereeCoins.toLocaleString()} bonus Coins</strong> {triggerRule}
+        </p>
+
+        {/* Referral Code Box */}
+        <div className="input-group" style={{ marginBottom: '12px' }}>
+          <label className="input-label" style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>YOUR REFERRAL CODE</label>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input 
+              type="text" 
+              className="input-field" 
+              value={user?.referralCode || 'SK...'} 
+              readOnly 
+              style={{ fontWeight: 800, fontSize: '1.05rem', letterSpacing: '0.1em', color: 'var(--accent-gold)' }}
+            />
+            <button className="btn-secondary" style={{ width: 'auto', padding: '0 16px' }} onClick={handleCopyLink}>
+              {copied ? <Check size={18} color="var(--accent-green)" /> : <Copy size={18} />}
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <button className="btn-primary" onClick={handleShareTelegram}>
+            <Share2 size={16} />
+            <span>Share Link</span>
+          </button>
+
+          <button className="btn-secondary" onClick={handleCopyLink}>
+            <Copy size={16} />
+            <span>{copied ? 'Copied!' : 'Copy Code'}</span>
+          </button>
+        </div>
+      </div>
+
       {/* Quick Action Community Banners */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
         <a
@@ -390,7 +436,7 @@ export default function ProfileTab({ user, referrals = [], referralSettings, onU
         </a>
       </div>
 
-      {/* Main Settings Menu Section (Matching Screenshot) */}
+      {/* Main Settings Menu Section */}
       <div className="glass-card" style={{ padding: '6px 10px', display: 'flex', flexDirection: 'column' }}>
         {menuItems.map((item, index) => {
           const IconComp = item.icon;
@@ -449,52 +495,6 @@ export default function ProfileTab({ user, referrals = [], referralSettings, onU
             </div>
           );
         })}
-      </div>
-
-      {/* Refer & Earn Banner Card */}
-      <div className="glass-card" style={{ border: '1px solid rgba(245, 158, 11, 0.4)', background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(217, 119, 6, 0.12) 100%)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Gift size={20} color="var(--accent-gold)" />
-            <span style={{ fontSize: '1rem', fontWeight: 800, color: '#fff' }}>Refer & Earn {referrerCoins.toLocaleString()} 🪙</span>
-          </div>
-          <span className="badge badge-gold">
-            ₹{(referrerCoins / 100).toFixed(0)} / Friend
-          </span>
-        </div>
-
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px', lineHeight: '1.4' }}>
-          Earn <strong style={{ color: 'var(--accent-gold)' }}>{referrerCoins.toLocaleString()} Coins</strong> for every friend you invite! They receive <strong style={{ color: 'var(--accent-green)' }}>{refereeCoins.toLocaleString()} bonus Coins</strong> {triggerRule}
-        </p>
-
-        {/* Referral Code Box */}
-        <div className="input-group" style={{ marginBottom: '12px' }}>
-          <label className="input-label" style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>YOUR REFERRAL CODE</label>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input 
-              type="text" 
-              className="input-field" 
-              value={user?.referralCode || 'SK...'} 
-              readOnly 
-              style={{ fontWeight: 800, fontSize: '1.05rem', letterSpacing: '0.1em', color: 'var(--accent-gold)' }}
-            />
-            <button className="btn-secondary" style={{ width: 'auto', padding: '0 16px' }} onClick={handleCopyLink}>
-              {copied ? <Check size={18} color="var(--accent-green)" /> : <Copy size={18} />}
-            </button>
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-          <button className="btn-primary" onClick={handleShareTelegram}>
-            <Share2 size={16} />
-            <span>Share Link</span>
-          </button>
-
-          <button className="btn-secondary" onClick={handleCopyLink}>
-            <Copy size={16} />
-            <span>{copied ? 'Copied!' : 'Copy Code'}</span>
-          </button>
-        </div>
       </div>
 
       {/* Referred Friends History */}
