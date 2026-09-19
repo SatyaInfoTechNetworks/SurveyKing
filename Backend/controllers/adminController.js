@@ -124,7 +124,7 @@ async function getDashboardStats(req, res) {
       const uD = await db.query('SELECT COUNT(*) as cnt FROM users WHERE DATE(created_at) = ?', [dateStr]);
       usersRegistered.push(parseInt(uD[0]?.cnt || 0, 10));
 
-      const sStartD = await db.query('SELECT COUNT(*) as cnt FROM survey_participations WHERE DATE(created_at) = ?', [dateStr]);
+      const sStartD = await db.query('SELECT COUNT(*) as cnt FROM survey_participations WHERE DATE(started_at) = ?', [dateStr]);
       surveysStarted.push(parseInt(sStartD[0]?.cnt || 0, 10));
 
       const sCompD = await db.query("SELECT COUNT(*) as cnt FROM survey_participations WHERE status = 'COMPLETED' AND DATE(completed_at) = ?", [dateStr]);
@@ -153,8 +153,8 @@ async function getDashboardStats(req, res) {
     const uPrev = prev7Users[0]?.cnt || 0;
     const usersGrowth = uPrev > 0 ? `${(((u7 - uPrev) / uPrev) * 100) >= 0 ? '+' : ''}${(((u7 - uPrev) / uPrev) * 100).toFixed(1)}%` : (u7 > 0 ? `+${u7 * 100}%` : '+0.0%');
 
-    const past7Comps = await db.query("SELECT COUNT(*) as cnt FROM survey_participations WHERE status = 'COMPLETED' AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
-    const prev7Comps = await db.query("SELECT COUNT(*) as cnt FROM survey_participations WHERE status = 'COMPLETED' AND created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) AND created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)");
+    const past7Comps = await db.query("SELECT COUNT(*) as cnt FROM survey_participations WHERE status = 'COMPLETED' AND completed_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
+    const prev7Comps = await db.query("SELECT COUNT(*) as cnt FROM survey_participations WHERE status = 'COMPLETED' AND completed_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) AND completed_at < DATE_SUB(NOW(), INTERVAL 7 DAY)");
     const c7 = past7Comps[0]?.cnt || 0;
     const cPrev = prev7Comps[0]?.cnt || 0;
     const completedGrowth = cPrev > 0 ? `${(((c7 - cPrev) / cPrev) * 100) >= 0 ? '+' : ''}${(((c7 - cPrev) / cPrev) * 100).toFixed(1)}%` : (c7 > 0 ? `+${c7 * 100}%` : '+0.0%');
@@ -303,10 +303,10 @@ async function getUserDetails(req, res) {
 
     // Real IP History from postbacks and audit logs
     const ipRows = await db.query(
-      `SELECT DISTINCT client_ip FROM postback_logs WHERE user_id = ? OR tg_user_id = ?`,
-      [String(user.telegram_user_id), String(user.telegram_user_id)]
+      `SELECT DISTINCT ip FROM postback_logs WHERE user_id = ? OR user_id = ?`,
+      [String(user.id), String(user.telegram_user_id)]
     );
-    const userIps = ipRows.map(r => r.client_ip).filter(Boolean);
+    const userIps = ipRows.map(r => r.ip).filter(Boolean);
     if (userIps.length === 0) userIps.push('127.0.0.1');
 
     return res.json({
@@ -1046,12 +1046,12 @@ async function getTelegramStatus(req, res) {
       SELECT COUNT(DISTINCT user_id) as cnt FROM (
         SELECT user_id FROM wallet_transactions WHERE DATE(created_at) = CURRENT_DATE()
         UNION
-        SELECT user_id FROM survey_participations WHERE DATE(created_at) = CURRENT_DATE()
+        SELECT user_id FROM survey_participations WHERE DATE(started_at) = CURRENT_DATE()
       ) as active_u
     `);
     const activeToday = activeTodayRow[0]?.cnt || 0;
 
-    const startsTodayRow = await db.query("SELECT COUNT(*) as cnt FROM survey_participations WHERE DATE(created_at) = CURRENT_DATE()");
+    const startsTodayRow = await db.query("SELECT COUNT(*) as cnt FROM survey_participations WHERE DATE(started_at) = CURRENT_DATE()");
     const surveysStartedToday = startsTodayRow[0]?.cnt || 0;
 
     return res.json({
@@ -1256,10 +1256,10 @@ async function getFraudCenter(req, res) {
 
     // Detect same IP clusters from postback_logs
     const ipClusters = await db.query(`
-      SELECT client_ip, COUNT(DISTINCT user_id) as user_count
+      SELECT ip, COUNT(DISTINCT user_id) as user_count
       FROM postback_logs
-      WHERE client_ip IS NOT NULL AND client_ip != '' AND client_ip != '127.0.0.1'
-      GROUP BY client_ip HAVING user_count > 1
+      WHERE ip IS NOT NULL AND ip != '' AND ip != '127.0.0.1'
+      GROUP BY ip HAVING user_count > 1
     `);
 
     const dynamicFlags = [];
@@ -1290,9 +1290,9 @@ async function getFraudCenter(req, res) {
       const clusterUsers = await db.query(`
         SELECT DISTINCT u.id as userId, u.telegram_user_id as userTgId, u.name as userName, u.username as userUsername, u.status as userStatus
         FROM postback_logs pb
-        JOIN users u ON pb.user_id = u.telegram_user_id OR pb.tg_user_id = u.telegram_user_id
-        WHERE pb.client_ip = ? LIMIT 5
-      `, [cluster.client_ip]);
+        JOIN users u ON pb.user_id = u.id OR pb.user_id = u.telegram_user_id
+        WHERE pb.ip = ? LIMIT 5
+      `, [cluster.ip]);
 
       clusterUsers.forEach(u => {
         if (!flagsFromDb.some(f => f.user_id === u.userId) && !dynamicFlags.some(f => f.userId === u.userId)) {
@@ -1306,8 +1306,8 @@ async function getFraudCenter(req, res) {
             userStatus: u.userStatus,
             risk_level: 'MEDIUM',
             flag_type: 'MULTIPLE_ACCOUNTS',
-            description: `IP ${cluster.client_ip} associated with ${cluster.user_count} distinct user profiles.`,
-            ip: cluster.client_ip,
+            description: `IP ${cluster.ip} associated with ${cluster.user_count} distinct user profiles.`,
+            ip: cluster.ip,
             status: 'OPEN',
             created_at: new Date().toISOString()
           });
@@ -1408,7 +1408,7 @@ async function getAnalytics(req, res) {
       SELECT COUNT(DISTINCT user_id) as cnt FROM (
         SELECT user_id FROM wallet_transactions WHERE DATE(created_at) = CURRENT_DATE()
         UNION
-        SELECT user_id FROM survey_participations WHERE DATE(created_at) = CURRENT_DATE()
+        SELECT user_id FROM survey_participations WHERE DATE(started_at) = CURRENT_DATE()
       ) as dau_t
     `);
     const dau = dauRow[0]?.cnt || 0;
@@ -1418,7 +1418,7 @@ async function getAnalytics(req, res) {
       SELECT COUNT(DISTINCT user_id) as cnt FROM (
         SELECT user_id FROM wallet_transactions WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
         UNION
-        SELECT user_id FROM survey_participations WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+        SELECT user_id FROM survey_participations WHERE started_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
       ) as wau_t
     `);
     const wau = wauRow[0]?.cnt || 0;
@@ -1428,7 +1428,7 @@ async function getAnalytics(req, res) {
       SELECT COUNT(DISTINCT user_id) as cnt FROM (
         SELECT user_id FROM wallet_transactions WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
         UNION
-        SELECT user_id FROM survey_participations WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        SELECT user_id FROM survey_participations WHERE started_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
       ) as mau_t
     `);
     const mau = mauRow[0]?.cnt || 0;
@@ -1460,7 +1460,7 @@ async function getAnalytics(req, res) {
           AND (
             EXISTS (SELECT 1 FROM wallet_transactions wt WHERE wt.user_id = u.id AND wt.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY))
             OR
-            EXISTS (SELECT 1 FROM survey_participations sp WHERE sp.user_id = u.id AND sp.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY))
+            EXISTS (SELECT 1 FROM survey_participations sp WHERE sp.user_id = u.id AND sp.started_at >= DATE_SUB(NOW(), INTERVAL 7 DAY))
           )
         `);
         const rCount = cohortRetained[0]?.cnt || 0;
