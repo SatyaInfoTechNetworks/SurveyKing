@@ -742,7 +742,7 @@ async function getLeaderboard(req, res) {
           COALESCE(SUM(wt.amount), 0) as total_earnings,
           COUNT(DISTINCT sp.id) as surveys_count
         FROM users u
-        JOIN wallet_transactions wt ON wt.user_id = u.id AND wt.type NOT IN ('WELCOME_BONUS', 'SIGNUP_BONUS', 'WITHDRAWAL', 'WITHDRAWAL_REFUND', 'ADMIN_ADJUSTMENT') ${dateFilter}
+        JOIN wallet_transactions wt ON wt.user_id = u.id AND wt.type = 'SURVEY_REWARD' AND wt.amount > 0 ${dateFilter}
         LEFT JOIN survey_participations sp ON sp.user_id = u.id AND sp.status = 'COMPLETED'
         WHERE u.status = 'ACTIVE'
         GROUP BY u.id
@@ -771,7 +771,7 @@ async function getLeaderboard(req, res) {
         const u = userRows[0];
         const userPeriodTx = await db.query(
           `SELECT COALESCE(SUM(amount), 0) as total FROM wallet_transactions wt 
-           WHERE wt.user_id = ? AND wt.type NOT IN ('WELCOME_BONUS', 'SIGNUP_BONUS', 'WITHDRAWAL', 'WITHDRAWAL_REFUND', 'ADMIN_ADJUSTMENT') ${dateFilter}`,
+           WHERE wt.user_id = ? AND wt.type = 'SURVEY_REWARD' AND wt.amount > 0 ${dateFilter}`,
           [u.id]
         );
         const userEarnings = parseFloat(userPeriodTx[0]?.total || 0);
@@ -788,7 +788,7 @@ async function getLeaderboard(req, res) {
               SELECT wt.user_id, SUM(wt.amount) as total
               FROM wallet_transactions wt
               JOIN users us ON wt.user_id = us.id
-              WHERE wt.type NOT IN ('WELCOME_BONUS', 'SIGNUP_BONUS', 'WITHDRAWAL', 'WITHDRAWAL_REFUND', 'ADMIN_ADJUSTMENT') AND us.status = 'ACTIVE' ${dateFilter}
+              WHERE wt.type = 'SURVEY_REWARD' AND wt.amount > 0 AND us.status = 'ACTIVE' ${dateFilter}
               GROUP BY wt.user_id
               HAVING total > ?
             ) as t`,
