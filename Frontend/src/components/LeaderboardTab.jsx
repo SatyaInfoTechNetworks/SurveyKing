@@ -208,9 +208,6 @@ export default function LeaderboardTab({ user }) {
               <div style={{ marginTop: '8px', fontSize: '0.85rem', fontWeight: 900, color: '#cbd5e1' }}>
                 {top2.totalEarnings.toLocaleString()} 🪙
               </div>
-              <div style={{ fontSize: '0.65rem', color: 'var(--accent-green)', fontWeight: 700 }}>
-                ₹{top2.rupees}
-              </div>
             </div>
           )}
 
@@ -274,9 +271,6 @@ export default function LeaderboardTab({ user }) {
               <div style={{ marginTop: '8px', fontSize: '0.95rem', fontWeight: 900, color: 'var(--accent-gold)' }}>
                 {top1.totalEarnings.toLocaleString()} 🪙
               </div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--accent-green)', fontWeight: 800 }}>
-                ₹{top1.rupees}
-              </div>
             </div>
           )}
 
@@ -336,9 +330,6 @@ export default function LeaderboardTab({ user }) {
               <div style={{ marginTop: '8px', fontSize: '0.85rem', fontWeight: 900, color: '#cbd5e1' }}>
                 {top2.totalEarnings.toLocaleString()} 🪙
               </div>
-              <div style={{ fontSize: '0.65rem', color: 'var(--accent-green)', fontWeight: 700 }}>
-                ₹{top2.rupees}
-              </div>
             </div>
           )}
 
@@ -397,9 +388,6 @@ export default function LeaderboardTab({ user }) {
               <div style={{ marginTop: '8px', fontSize: '0.85rem', fontWeight: 900, color: '#fb923c' }}>
                 {top3.totalEarnings.toLocaleString()} 🪙
               </div>
-              <div style={{ fontSize: '0.65rem', color: 'var(--accent-green)', fontWeight: 700 }}>
-                ₹{top3.rupees}
-              </div>
             </div>
           )}
         </div>
@@ -444,9 +432,6 @@ export default function LeaderboardTab({ user }) {
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '0.95rem', fontWeight: 900, color: 'var(--accent-gold)' }}>
               {(currentUserRank.totalEarnings || 0).toLocaleString()} 🪙
-            </div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--accent-green)', fontWeight: 700 }}>
-              ≈ ₹{currentUserRank.rupees || '0'}
             </div>
           </div>
         </div>
@@ -511,9 +496,6 @@ export default function LeaderboardTab({ user }) {
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff' }}>
                   {item.totalEarnings.toLocaleString()} 🪙
-                </div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--accent-green)', fontWeight: 700 }}>
-                  ₹{item.rupees}
                 </div>
               </div>
             </div>
