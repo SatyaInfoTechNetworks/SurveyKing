@@ -181,6 +181,8 @@ app.put('/api/admin/opinion-universe/surveys/:id/feature', ouController.featureS
 app.put('/api/admin/opinion-universe/surveys/:id/coins', ouController.updateSurveyCoins);
 app.put('/api/admin/opinion-universe/surveys/:id/extra-info', ouController.updateSurveyExtraInfo);
 app.delete('/api/admin/opinion-universe/surveys/:id', ouController.deleteSurvey);
+app.put('/api/admin/opinion-universe/surveys/:id/restore', ouController.restoreSurvey);
+app.delete('/api/admin/opinion-universe/surveys/:id/permanent', ouController.permanentDeleteSurvey);
 app.get('/api/admin/opinion-universe/clicks', ouController.getAdminSurveyClicks);
 app.get('/api/admin/opinion-universe/conversions', ouController.getAdminConversions);
 

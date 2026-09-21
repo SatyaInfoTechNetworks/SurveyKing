@@ -119,7 +119,17 @@ async function fetchLiveOffers(req, res) {
 
 async function getAdminSurveys(req, res) {
   try {
-    const rows = await db.query('SELECT * FROM opinion_universe_surveys WHERE status != ? ORDER BY is_featured DESC, created_at DESC', ['deleted']);
+    const statusFilter = req.query.status;
+    let queryStr = 'SELECT * FROM opinion_universe_surveys WHERE status != ? ORDER BY is_featured DESC, created_at DESC';
+    let params = ['deleted'];
+    if (statusFilter === 'deleted') {
+      queryStr = 'SELECT * FROM opinion_universe_surveys WHERE status = ? ORDER BY updated_at DESC';
+      params = ['deleted'];
+    } else if (statusFilter === 'all') {
+      queryStr = 'SELECT * FROM opinion_universe_surveys ORDER BY is_featured DESC, created_at DESC';
+      params = [];
+    }
+    const rows = await db.query(queryStr, params);
     return res.json({ success: true, surveys: rows });
   } catch (err) {
     return res.status(500).json({ success: false, error: 'Failed to fetch surveys' });
@@ -184,9 +194,29 @@ async function deleteSurvey(req, res) {
   try {
     const { id } = req.params;
     await db.execute('UPDATE opinion_universe_surveys SET status = ? WHERE id = ?', ['deleted', id]);
-    return res.json({ success: true, message: 'Survey removed.' });
+    return res.json({ success: true, message: 'Survey moved to Trash (temporarily deleted).' });
   } catch (err) {
-    return res.status(500).json({ success: false, error: 'Failed to delete survey' });
+    return res.status(500).json({ success: false, error: 'Failed to move survey to trash' });
+  }
+}
+
+async function restoreSurvey(req, res) {
+  try {
+    const { id } = req.params;
+    await db.execute('UPDATE opinion_universe_surveys SET status = ? WHERE id = ?', ['active', id]);
+    return res.json({ success: true, message: 'Survey restored to active!' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to restore survey' });
+  }
+}
+
+async function permanentDeleteSurvey(req, res) {
+  try {
+    const { id } = req.params;
+    await db.execute('DELETE FROM opinion_universe_surveys WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Survey permanently deleted from database.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to permanently delete survey' });
   }
 }
 
@@ -460,7 +490,8 @@ async function getAdminConversions(req, res) {
 
 module.exports = {
   fetchLiveOffers, getAdminSurveys, addSurvey, updateSurveyStatus,
-  featureSurvey, deleteSurvey, updateSurveyCoins, updateSurveyExtraInfo, getUserSurveyFeed,
+  featureSurvey, deleteSurvey, restoreSurvey, permanentDeleteSurvey,
+  updateSurveyCoins, updateSurveyExtraInfo, getUserSurveyFeed,
   startSurvey, handlePostback, getAdminSurveyClicks, getAdminConversions
 };
 

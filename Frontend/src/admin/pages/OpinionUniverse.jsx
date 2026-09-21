@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Search, Plus, ToggleLeft, ToggleRight, Star, Trash2, ExternalLink, RefreshCw, Zap, Clock, Coins, TrendingUp, CheckCircle, XCircle, MousePointerClick, Copy, FileText } from 'lucide-react';
+import { Globe, Search, Plus, ToggleLeft, ToggleRight, Star, Trash2, ExternalLink, RefreshCw, Zap, Clock, Coins, TrendingUp, CheckCircle, XCircle, MousePointerClick, Copy, FileText, RotateCcw, Link2 } from 'lucide-react';
 
 const cardStyle = {
   background: 'rgba(255,255,255,0.03)',
@@ -168,6 +168,9 @@ export default function OpinionUniversePage({ onNotify }) {
   const [fetchError, setFetchError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [managedSurveys, setManagedSurveys] = useState([]);
+  const [trashSurveys, setTrashSurveys] = useState([]);
+  const [managedView, setManagedView] = useState('active');
+  const [expandedLinkId, setExpandedLinkId] = useState(null);
   const [clicks, setClicks] = useState([]);
   const [conversions, setConversions] = useState([]);
   const [editingTipsSurveyId, setEditingTipsSurveyId] = useState(null);
@@ -200,9 +203,14 @@ export default function OpinionUniversePage({ onNotify }) {
 
   const loadManagedSurveys = async () => {
     try {
-      const res = await fetch('/api/admin/opinion-universe/surveys');
-      const data = await res.json();
-      if (data.success) setManagedSurveys(data.surveys);
+      const [resActive, resTrash] = await Promise.all([
+        fetch('/api/admin/opinion-universe/surveys'),
+        fetch('/api/admin/opinion-universe/surveys?status=deleted')
+      ]);
+      const dataActive = await resActive.json();
+      const dataTrash = await resTrash.json();
+      if (dataActive.success) setManagedSurveys(dataActive.surveys);
+      if (dataTrash.success) setTrashSurveys(dataTrash.surveys);
     } catch (e) { console.error(e); }
   };
 
@@ -303,13 +311,46 @@ export default function OpinionUniversePage({ onNotify }) {
     } catch (e) { alert('Error'); }
   };
 
-  const handleDeleteSurvey = async (survey) => {
-    if (!window.confirm(`Remove "${survey.title}" from Survey King?`)) return;
+  const handleMoveToTrash = async (survey) => {
+    if (!window.confirm(`Move "${survey.title}" to Trash (Temporary Deleted Area)?`)) return;
     try {
       const res = await fetch(`/api/admin/opinion-universe/surveys/${survey.id}`, { method: 'DELETE' });
       const data = await res.json();
-      if (data.success) { onNotify(data.message); loadManagedSurveys(); }
-    } catch (e) { alert('Error'); }
+      if (data.success) {
+        onNotify(data.message);
+        loadManagedSurveys();
+      } else alert(data.error || 'Failed to move to trash');
+    } catch (e) { alert('Error: ' + e.message); }
+  };
+
+  const handleRestoreSurvey = async (survey) => {
+    try {
+      const res = await fetch(`/api/admin/opinion-universe/surveys/${survey.id}/restore`, { method: 'PUT' });
+      const data = await res.json();
+      if (data.success) {
+        onNotify(data.message);
+        loadManagedSurveys();
+      } else alert(data.error || 'Failed to restore');
+    } catch (e) { alert('Error: ' + e.message); }
+  };
+
+  const handlePermanentDelete = async (survey) => {
+    if (!window.confirm(`⚠️ PERMANENT DELETE WARNING:\n\nAre you sure you want to permanently delete "${survey.title}" from the database?\n\nThis CANNOT be undone!`)) return;
+    try {
+      const res = await fetch(`/api/admin/opinion-universe/surveys/${survey.id}/permanent`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        onNotify(data.message);
+        loadManagedSurveys();
+      } else alert(data.error || 'Failed to delete permanently');
+    } catch (e) { alert('Error: ' + e.message); }
+  };
+
+  const handleTestManagedSurvey = (survey) => {
+    const testUrl = (survey.survey_url_template || '')
+      .replace(/{YOUR_CLICK_ID}/g, 'ADMIN_TEST_' + Date.now())
+      .replace(/{YOUR_SOURCE_ID}/g, 'admin_test');
+    window.open(testUrl, '_blank');
   };
 
   const filteredOffers = liveOffers.filter(o => {
@@ -337,7 +378,7 @@ export default function OpinionUniversePage({ onNotify }) {
 
   const subTabs = [
     { id: 'fetch', label: '🔍 Fetch & Add Surveys' },
-    { id: 'managed', label: `📋 Managed Surveys (${managedSurveys.length})` },
+    { id: 'managed', label: `📋 Managed Surveys (${managedSurveys.length})${trashSurveys.length > 0 ? ` [${trashSurveys.length} in trash]` : ''}` },
     { id: 'clicks', label: `📊 Offer History & Transactions (${clicks.length})` },
     { id: 'conversions', label: `💰 Conversions Log (${conversions.length})` }
   ];
@@ -548,117 +589,350 @@ export default function OpinionUniversePage({ onNotify }) {
       {/* ---- SUB-TAB: MANAGED SURVEYS ---- */}
       {activeSubTab === 'managed' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+          {/* Top Bar: View toggles (Active vs Trash) + Refresh */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setManagedView('active')}
+                style={{
+                  ...btnSecondary,
+                  background: managedView === 'active' ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.04)',
+                  borderColor: managedView === 'active' ? '#6366f1' : 'rgba(255,255,255,0.08)',
+                  color: managedView === 'active' ? '#a5b4fc' : '#94a3b8',
+                  padding: '7px 14px',
+                  fontSize: '0.8rem'
+                }}
+              >
+                📋 Active Surveys ({managedSurveys.length})
+              </button>
+              <button
+                onClick={() => setManagedView('trash')}
+                style={{
+                  ...btnSecondary,
+                  background: managedView === 'trash' ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.04)',
+                  borderColor: managedView === 'trash' ? '#ef4444' : 'rgba(255,255,255,0.08)',
+                  color: managedView === 'trash' ? '#f87171' : '#94a3b8',
+                  padding: '7px 14px',
+                  fontSize: '0.8rem'
+                }}
+              >
+                🗑️ Trash / Deleted Area ({trashSurveys.length})
+              </button>
+            </div>
             <button onClick={loadManagedSurveys} style={btnSecondary}><RefreshCw size={14} /> Refresh</button>
           </div>
-          {managedSurveys.length === 0 ? (
-            <div style={{ ...cardStyle, textAlign: 'center', padding: '50px', color: 'var(--text-muted,#64748b)' }}>
-              No surveys added yet. Go to "Fetch & Add Surveys" to add your first survey.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {managedSurveys.map(s => (
-                <div key={s.id} style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-                  {s.image_url && <img src={s.image_url} alt="" style={{ width: 52, height: 52, borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} />}
-                  <div style={{ flex: 1, minWidth: '180px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff' }}>{s.title}</span>
-                      {s.is_featured ? <span style={{ fontSize: '0.65rem', background: 'rgba(245,158,11,0.2)', color: '#f59e0b', padding: '2px 7px', borderRadius: '5px', fontWeight: 800 }}>⭐ FEATURED</span> : null}
-                      <span style={{ fontSize: '0.65rem', background: s.status === 'active' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.12)', color: s.status === 'active' ? '#10b981' : '#f87171', padding: '2px 7px', borderRadius: '5px', fontWeight: 800 }}>
-                        {s.status.toUpperCase()}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                      ID: <strong style={{ color: '#a5b4fc' }}>{s.external_offer_id}</strong> &nbsp;•&nbsp;
-                      Amount: <strong style={{ color: '#10b981' }}>{(s.coins_reward || 0).toLocaleString()}</strong> &nbsp;•&nbsp;
-                      LOI: <strong style={{ color: '#f59e0b' }}>{s.loi} min</strong> &nbsp;•&nbsp;
-                      {s.countries}
-                    </div>
-                  </div>
 
-                  {/* Coins Reward Input */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
-                    <div style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700 }}>COINS REWARD</div>
-                    <CoinsInput surveyId={s.id} currentCoins={s.coins_reward} onSave={loadManagedSurveys} />
-                  </div>
+          {/* ACTIVE SURVEYS VIEW */}
+          {managedView === 'active' && (
+            managedSurveys.length === 0 ? (
+              <div style={{ ...cardStyle, textAlign: 'center', padding: '50px', color: 'var(--text-muted,#64748b)' }}>
+                No active surveys found. Go to "Fetch & Add Surveys" to add your first survey.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {managedSurveys.map(s => (
+                  <div key={s.id} style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                      {s.image_url && <img src={s.image_url} alt="" style={{ width: 52, height: 52, borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} />}
+                      <div style={{ flex: 1, minWidth: '180px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff' }}>{s.title}</span>
+                          {s.is_featured ? <span style={{ fontSize: '0.65rem', background: 'rgba(245,158,11,0.2)', color: '#f59e0b', padding: '2px 7px', borderRadius: '5px', fontWeight: 800 }}>⭐ FEATURED</span> : null}
+                          <span style={{ fontSize: '0.65rem', background: s.status === 'active' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.12)', color: s.status === 'active' ? '#10b981' : '#f87171', padding: '2px 7px', borderRadius: '5px', fontWeight: 800 }}>
+                            {s.status.toUpperCase()}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                          ID: <strong style={{ color: '#a5b4fc' }}>{s.external_offer_id}</strong> &nbsp;•&nbsp;
+                          Amount: <strong style={{ color: '#10b981' }}>{(s.coins_reward || 0).toLocaleString()}</strong> &nbsp;•&nbsp;
+                          LOI: <strong style={{ color: '#f59e0b' }}>{s.loi} min</strong> &nbsp;•&nbsp;
+                          {s.countries}
+                        </div>
+                      </div>
 
-                  {/* Actions */}
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <button
-                      onClick={() => setEditingTipsSurveyId(editingTipsSurveyId === s.id ? null : s.id)}
-                      title="Add or Edit Extra Info & How to Qualify Guide"
-                      style={{
-                        ...btnSecondary,
-                        padding: '7px 12px',
-                        background: s.qualification_tips ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.06)',
-                        borderColor: s.qualification_tips ? '#6366f1' : 'rgba(255,255,255,0.12)',
-                        color: s.qualification_tips ? '#a5b4fc' : '#fff'
-                      }}
-                    >
-                      <FileText size={14} />
-                      <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>
-                        {s.qualification_tips ? 'Edit Qualify Tips' : '+ Add Qualify Tips'}
-                      </span>
-                    </button>
+                      {/* Coins Reward Input */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end' }}>
+                        <div style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700 }}>COINS REWARD</div>
+                        <CoinsInput surveyId={s.id} currentCoins={s.coins_reward} onSave={loadManagedSurveys} />
+                      </div>
 
-                    <button
-                      onClick={() => handleToggleFeature(s)}
-                      title={s.is_featured ? 'Unfeature' : 'Feature'}
-                      style={{ ...btnSecondary, padding: '7px 10px', color: s.is_featured ? '#f59e0b' : undefined }}
-                    >
-                      <Star size={14} fill={s.is_featured ? '#f59e0b' : 'none'} />
-                    </button>
+                      {/* Actions */}
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <button
+                          onClick={() => setEditingTipsSurveyId(editingTipsSurveyId === s.id ? null : s.id)}
+                          title="Add or Edit Extra Info & How to Qualify Guide"
+                          style={{
+                            ...btnSecondary,
+                            padding: '7px 12px',
+                            background: s.qualification_tips ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.06)',
+                            borderColor: s.qualification_tips ? '#6366f1' : 'rgba(255,255,255,0.12)',
+                            color: s.qualification_tips ? '#a5b4fc' : '#fff'
+                          }}
+                        >
+                          <FileText size={14} />
+                          <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>
+                            {s.qualification_tips ? 'Edit Qualify Tips' : '+ Add Qualify Tips'}
+                          </span>
+                        </button>
 
-                    <button
-                      onClick={() => handleToggleStatus(s)}
-                      disabled={togglingId === s.id}
-                      title={s.status === 'active' ? 'Disable' : 'Enable'}
-                      style={{ ...btnSecondary, padding: '7px 10px', color: s.status === 'active' ? '#10b981' : '#f87171' }}
-                    >
-                      {s.status === 'active' ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
-                    </button>
+                        <button
+                          onClick={() => setExpandedLinkId(expandedLinkId === s.id ? null : s.id)}
+                          title="Inspect Offer URL / Test Link"
+                          style={{
+                            ...btnSecondary,
+                            padding: '7px 10px',
+                            background: expandedLinkId === s.id ? 'rgba(16,185,129,0.2)' : undefined,
+                            borderColor: expandedLinkId === s.id ? '#10b981' : undefined,
+                            color: expandedLinkId === s.id ? '#10b981' : '#a5b4fc'
+                          }}
+                        >
+                          <Link2 size={15} />
+                        </button>
 
-                    <button onClick={() => handleDeleteSurvey(s)} style={{ ...btnSecondary, padding: '7px 10px', color: '#ef4444' }}>
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
+                        <button
+                          onClick={() => handleToggleFeature(s)}
+                          title={s.is_featured ? 'Unfeature' : 'Feature'}
+                          style={{ ...btnSecondary, padding: '7px 10px', color: s.is_featured ? '#f59e0b' : undefined }}
+                        >
+                          <Star size={14} fill={s.is_featured ? '#f59e0b' : 'none'} />
+                        </button>
 
-                  {/* Qualification Tips Preview (if set and not editing) */}
-                  {s.qualification_tips && editingTipsSurveyId !== s.id && (
-                    <div style={{
-                      width: '100%',
-                      background: 'rgba(99,102,241,0.08)',
-                      border: '1px solid rgba(99,102,241,0.2)',
-                      borderRadius: '8px',
-                      padding: '8px 12px',
-                      fontSize: '0.76rem',
-                      color: '#c7d2fe',
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '8px'
-                    }}>
-                      <span style={{ fontSize: '0.9rem' }}>💡</span>
-                      <div>
-                        <strong style={{ color: '#a5b4fc', display: 'block', marginBottom: '2px' }}>How to Qualify Tips:</strong>
-                        <span style={{ color: '#e0e7ff', whiteSpace: 'pre-line' }}>{s.qualification_tips}</span>
+                        <button
+                          onClick={() => handleToggleStatus(s)}
+                          disabled={togglingId === s.id}
+                          title={s.status === 'active' ? 'Disable' : 'Enable'}
+                          style={{ ...btnSecondary, padding: '7px 10px', color: s.status === 'active' ? '#10b981' : '#f87171' }}
+                        >
+                          {s.status === 'active' ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                        </button>
+
+                        <button
+                          onClick={() => handleMoveToTrash(s)}
+                          title="Move to Trash (Temporary Delete)"
+                          style={{ ...btnSecondary, padding: '7px 10px', color: '#f87171', borderColor: 'rgba(239,68,68,0.3)' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     </div>
-                  )}
 
-                  {/* Inline Editor for Extra Info & Qualify Tips */}
-                  {editingTipsSurveyId === s.id && (
-                    <SurveyExtraInfoEditor
-                      survey={s}
-                      onSave={(msg) => {
-                        onNotify(msg);
-                        setEditingTipsSurveyId(null);
-                        loadManagedSurveys();
-                      }}
-                      onCancel={() => setEditingTipsSurveyId(null)}
-                    />
-                  )}
+                    {/* Offer URL Inspector Drawer */}
+                    {expandedLinkId === s.id && (
+                      <div style={{
+                        background: 'rgba(15,23,42,0.7)',
+                        border: '1px solid rgba(99,102,241,0.25)',
+                        borderRadius: '10px',
+                        padding: '12px 14px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            🔗 Opinion Universe Router Link (offer_url_easy template)
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(s.survey_url_template || '');
+                                onNotify('Link copied to clipboard!');
+                              }}
+                              style={{ ...btnSecondary, padding: '4px 10px', fontSize: '0.72rem' }}
+                            >
+                              <Copy size={12} /> Copy Template
+                            </button>
+                            <button
+                              onClick={() => handleTestManagedSurvey(s)}
+                              style={{ ...btnPrimary, padding: '4px 12px', fontSize: '0.72rem' }}
+                            >
+                              <ExternalLink size={12} /> Test / Open Link
+                            </button>
+                          </div>
+                        </div>
+                        <div style={{
+                          fontFamily: 'monospace',
+                          fontSize: '0.74rem',
+                          color: '#e2e8f0',
+                          wordBreak: 'break-all',
+                          background: 'rgba(0,0,0,0.35)',
+                          padding: '8px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255,255,255,0.06)'
+                        }}>
+                          {s.survey_url_template || 'No URL stored'}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                          ℹ️ When a user clicks this survey, Survey King dynamically replaces <code style={{ color: '#38bdf8' }}>{'{YOUR_CLICK_ID}'}</code> with the transaction ID and <code style={{ color: '#38bdf8' }}>{'{YOUR_SOURCE_ID}'}</code> with the user's ID.
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Qualification Tips Preview (if set and not editing) */}
+                    {s.qualification_tips && editingTipsSurveyId !== s.id && (
+                      <div style={{
+                        background: 'rgba(99,102,241,0.08)',
+                        border: '1px solid rgba(99,102,241,0.2)',
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        fontSize: '0.76rem',
+                        color: '#c7d2fe',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '8px'
+                      }}>
+                        <span style={{ fontSize: '0.9rem' }}>💡</span>
+                        <div>
+                          <strong style={{ color: '#a5b4fc', display: 'block', marginBottom: '2px' }}>How to Qualify Tips:</strong>
+                          <span style={{ color: '#e0e7ff', whiteSpace: 'pre-line' }}>{s.qualification_tips}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Inline Editor for Extra Info & Qualify Tips */}
+                    {editingTipsSurveyId === s.id && (
+                      <SurveyExtraInfoEditor
+                        survey={s}
+                        onSave={(msg) => {
+                          onNotify(msg);
+                          setEditingTipsSurveyId(null);
+                          loadManagedSurveys();
+                        }}
+                        onCancel={() => setEditingTipsSurveyId(null)}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+
+          {/* TRASH / TEMPORARY DELETED AREA */}
+          {managedView === 'trash' && (
+            <div>
+              <div style={{ marginBottom: '12px', fontSize: '0.78rem', color: '#f87171', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>🗑️</span>
+                <span>These surveys are temporarily deleted. Users cannot see them. You can <strong>Restore</strong> them back to active or <strong>Permanently Delete</strong> them directly from the database.</span>
+              </div>
+              {trashSurveys.length === 0 ? (
+                <div style={{ ...cardStyle, textAlign: 'center', padding: '50px', color: 'var(--text-muted,#64748b)' }}>
+                  Trash is empty. No deleted surveys found.
                 </div>
-              ))}
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {trashSurveys.map(s => (
+                    <div key={s.id} style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: '12px', border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.03)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                        {s.image_url && <img src={s.image_url} alt="" style={{ width: 52, height: 52, borderRadius: '8px', objectFit: 'cover', opacity: 0.6, flexShrink: 0 }} />}
+                        <div style={{ flex: 1, minWidth: '180px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#e2e8f0', textDecoration: 'line-through' }}>{s.title}</span>
+                            <span style={{ fontSize: '0.65rem', background: 'rgba(239,68,68,0.2)', color: '#f87171', padding: '2px 7px', borderRadius: '5px', fontWeight: 800 }}>
+                              🗑️ IN TRASH (DELETED)
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                            ID: <strong style={{ color: '#a5b4fc' }}>{s.external_offer_id}</strong> &nbsp;•&nbsp;
+                            Coins: <strong style={{ color: '#94a3b8' }}>{(s.coins_reward || 0).toLocaleString()}</strong> &nbsp;•&nbsp;
+                            LOI: <strong style={{ color: '#94a3b8' }}>{s.loi} min</strong> &nbsp;•&nbsp;
+                            {s.countries}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                          <button
+                            onClick={() => setExpandedLinkId(expandedLinkId === s.id ? null : s.id)}
+                            title="Inspect Offer URL"
+                            style={{ ...btnSecondary, padding: '7px 10px', color: '#a5b4fc' }}
+                          >
+                            <Link2 size={15} />
+                          </button>
+
+                          <button
+                            onClick={() => handleRestoreSurvey(s)}
+                            title="Restore Survey to Active"
+                            style={{
+                              ...btnSecondary,
+                              padding: '7px 12px',
+                              background: 'rgba(16,185,129,0.15)',
+                              borderColor: 'rgba(16,185,129,0.4)',
+                              color: '#10b981',
+                              fontSize: '0.78rem'
+                            }}
+                          >
+                            <RotateCcw size={14} />
+                            <span>Restore Survey</span>
+                          </button>
+
+                          <button
+                            onClick={() => handlePermanentDelete(s)}
+                            title="Permanently Delete from Database"
+                            style={{
+                              ...btnSecondary,
+                              padding: '7px 12px',
+                              background: 'rgba(239,68,68,0.2)',
+                              borderColor: '#ef4444',
+                              color: '#f87171',
+                              fontSize: '0.78rem'
+                            }}
+                          >
+                            <Trash2 size={14} />
+                            <span>Delete Permanently</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Offer URL Inspector Drawer inside Trash */}
+                      {expandedLinkId === s.id && (
+                        <div style={{
+                          background: 'rgba(15,23,42,0.7)',
+                          border: '1px solid rgba(239,68,68,0.25)',
+                          borderRadius: '10px',
+                          padding: '12px 14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              🔗 Offer Router Link (offer_url_easy)
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(s.survey_url_template || '');
+                                  onNotify('Link copied to clipboard!');
+                                }}
+                                style={{ ...btnSecondary, padding: '4px 10px', fontSize: '0.72rem' }}
+                              >
+                                <Copy size={12} /> Copy Template
+                              </button>
+                              <button
+                                onClick={() => handleTestManagedSurvey(s)}
+                                style={{ ...btnPrimary, padding: '4px 12px', fontSize: '0.72rem' }}
+                              >
+                                <ExternalLink size={12} /> Test / Open Link
+                              </button>
+                            </div>
+                          </div>
+                          <div style={{
+                            fontFamily: 'monospace',
+                            fontSize: '0.74rem',
+                            color: '#e2e8f0',
+                            wordBreak: 'break-all',
+                            background: 'rgba(0,0,0,0.35)',
+                            padding: '8px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(255,255,255,0.06)'
+                          }}>
+                            {s.survey_url_template || 'No URL stored'}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
