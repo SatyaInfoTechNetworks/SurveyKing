@@ -5,7 +5,7 @@ require('dotenv').config();
 
 const OU_PUB_ID = process.env.OU_PUB_ID || '1863';
 const OU_APP_ID = process.env.OU_APP_ID || 'ID_1c73aa4e879a0aab3555de6b40256fed';
-const OU_API_KEY = process.env.OU_API_KEY || '975ae2dffc8c54f77e8b4bde9c13f95707e4b4434f6bfa2';
+const OU_API_KEY = process.env.OU_API_KEY || '975ae2dffc8c54f77e8b4bde9c131f95707e4b4434f6bfa2';
 const OU_SOURCE = process.env.OU_SOURCE || 'survey_king';
 
 function generateClickId(userId, externalOfferId) {
