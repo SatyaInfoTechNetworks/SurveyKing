@@ -120,14 +120,19 @@ export default function OpinionUniversePage({ onNotify }) {
     try {
       const res = await fetch('/api/admin/opinion-universe/fetch');
       const data = await res.json();
+      console.log('[OU] Fetch response:', data);
       if (data.success) {
         setLiveOffers(data.offers);
         onNotify(`Fetched ${data.offers.length} live surveys from Opinion Universe!`);
       } else {
-        setFetchError(data.error || 'Failed to fetch');
+        const errMsg = data.error || 'Unknown error';
+        const rawInfo = data.raw ? ` | Raw: ${JSON.stringify(data.raw)}` : '';
+        console.error('[OU] API Error:', errMsg, data.raw || '');
+        setFetchError(errMsg + rawInfo);
       }
     } catch (e) {
-      setFetchError('Network error fetching surveys');
+      console.error('[OU] Network error:', e);
+      setFetchError('Network error: ' + e.message);
     } finally {
       setFetchLoading(false);
     }

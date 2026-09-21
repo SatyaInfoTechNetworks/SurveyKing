@@ -32,28 +32,60 @@ function httpGet(url) {
 async function fetchLiveOffers(req, res) {
   try {
     const url = `https://api.opinionuniverse.com/publisher/offersFeed?pubid=${OU_PUB_ID}&appid=${OU_APP_ID}&apikey=${OU_API_KEY}`;
-    console.log('Fetching Opinion Universe live offers...');
+    console.log('============================================');
+    console.log('OU API REQUEST URL:', url);
+    console.log('OU_PUB_ID:', OU_PUB_ID, '| OU_APP_ID:', OU_APP_ID);
+    console.log('============================================');
+
     const data = await httpGet(url);
-    if (data.code !== 200 || data.message !== 'success') {
-      return res.status(502).json({ success: false, error: 'Opinion Universe API error', raw: data });
+
+    // Log full raw response so we can see exactly what OU returns
+    console.log('OU API RAW RESPONSE:');
+    console.log(JSON.stringify(data, null, 2));
+    console.log('============================================');
+
+    // Lenient success check: accept numeric 200 OR string "200", accept any truthy message
+    const isSuccess =
+      (data.code === 200 || data.code === '200' || data.status === 200 || data.status === 'success') &&
+      (data.message === 'success' || data.status === 'success' || data.success === true);
+
+    // If still not success, check if offers exist anyway (some providers skip the status field)
+    const offersRaw =
+      data?.data?.response?.offers ||
+      data?.data?.offers ||
+      data?.response?.offers ||
+      data?.offers ||
+      [];
+
+    if (!isSuccess && offersRaw.length === 0) {
+      console.error('OU API non-success response. Full response logged above.');
+      return res.status(502).json({
+        success: false,
+        error: `Opinion Universe API error (code: ${data.code}, message: ${data.message})`,
+        raw: data
+      });
     }
-    const offers = data?.data?.response?.offers || [];
+
+    const offers = offersRaw;
+    console.log(`OU API: Found ${offers.length} offers.`);
+
     return res.json({
       success: true, count: offers.length,
-      currencyName: data?.data?.response?.currency_name || 'Points',
+      currencyName: data?.data?.response?.currency_name || data?.data?.currency_name || 'Points',
       offers: offers.map(o => ({
         offerId: o.offer_id, offerName: o.offer_name, offerDesc: o.offer_desc || null,
-        callToAction: o.call_to_action || null, offerUrlTemplate: o.offer_url_easy,
+        callToAction: o.call_to_action || null, offerUrlTemplate: o.offer_url_easy || o.offer_url || '',
         payout: parseFloat(o.payout || o.amount || 0), offerType: o.offer_type || 'Consumer',
         imageUrl: o.image_url || null, loi: o.loi || 0, ir: o.ir || 0,
         countries: o.countries || 'All', devices: o.devices || 'All'
       }))
     });
   } catch (err) {
-    console.error('Error fetching OU offers:', err);
+    console.error('Error fetching OU offers:', err.message, err.stack);
     return res.status(500).json({ success: false, error: 'Failed to fetch offers: ' + err.message });
   }
 }
+
 
 async function getAdminSurveys(req, res) {
   try {
