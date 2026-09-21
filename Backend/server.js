@@ -93,8 +93,6 @@ app.post('/api/telegram/withdraw', telegramController.requestWithdrawal);
 app.post('/api/telegram/promo/claim', telegramController.claimPromoCode);
 app.post('/api/telegram/ad-ids', telegramController.updateAdIds);
 app.get('/api/telegram/leaderboard', telegramController.getLeaderboard);
-app.get('/api/telegram/streak', telegramController.getStreakStatus);
-app.post('/api/telegram/streak/claim', telegramController.claimStreakAd);
 
 // Webhook APIs (CPX Research, TimeWall & Adsgram)
 app.get('/api/webhooks/adsgram', webhookController.handleAdsgramWebhook);

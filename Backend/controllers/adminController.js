@@ -987,15 +987,8 @@ async function getReferralsList(req, res) {
 async function getReferralSettings(req, res) {
   try {
     const rows = await db.query('SELECT * FROM platform_settings WHERE id = 1');
-    const settings = rows[0] || { referrer_reward_coins: 1000, referee_reward_coins: 500, referral_trigger: 'FIRST_SURVEY', min_survey_reward_coins: 100, adsgram_block_id: '46060', streak_reward_coins: 100, streak_rewards_json: '[100, 150, 200, 250, 300, 400, 500]' };
+    const settings = rows[0] || { referrer_reward_coins: 1000, referee_reward_coins: 500, referral_trigger: 'FIRST_SURVEY', min_survey_reward_coins: 100, adsgram_block_id: '46060' };
     
-    let parsedRewards = [100, 150, 200, 250, 300, 400, 500];
-    try {
-      if (settings.streak_rewards_json) {
-        parsedRewards = JSON.parse(settings.streak_rewards_json);
-      }
-    } catch (e) {}
-
     return res.json({
       success: true,
       settings: {
@@ -1003,9 +996,7 @@ async function getReferralSettings(req, res) {
         refereeRewardCoins: settings.referee_reward_coins,
         referralTrigger: settings.referral_trigger,
         minSurveyRewardCoins: settings.min_survey_reward_coins,
-        adsgramBlockId: settings.adsgram_block_id || '46060',
-        streakRewardCoins: settings.streak_reward_coins || 100,
-        streakRewardsJson: parsedRewards
+        adsgramBlockId: settings.adsgram_block_id || '46060'
       }
     });
   } catch (err) {
@@ -1015,7 +1006,7 @@ async function getReferralSettings(req, res) {
 
 async function updateReferralSettings(req, res) {
   try {
-    const { referrerRewardCoins, refereeRewardCoins, referralTrigger, minSurveyRewardCoins, minWithdrawalCoins, adsgramBlockId, streakRewardCoins, streakRewardsJson } = req.body;
+    const { referrerRewardCoins, refereeRewardCoins, referralTrigger, minSurveyRewardCoins, minWithdrawalCoins, adsgramBlockId } = req.body;
 
     let sql = `UPDATE platform_settings SET referrer_reward_coins = ?, referee_reward_coins = ?, referral_trigger = ?, min_survey_reward_coins = ?`;
     let params = [referrerRewardCoins || 1000, refereeRewardCoins || 500, referralTrigger || 'FIRST_SURVEY', minSurveyRewardCoins || 100];
@@ -1030,17 +1021,6 @@ async function updateReferralSettings(req, res) {
       params.push(String(adsgramBlockId).trim());
     }
 
-    if (streakRewardCoins !== undefined) {
-      sql += `, streak_reward_coins = ?`;
-      params.push(parseInt(streakRewardCoins, 10));
-    }
-
-    if (streakRewardsJson !== undefined) {
-      sql += `, streak_rewards_json = ?`;
-      const jsonStr = typeof streakRewardsJson === 'string' ? streakRewardsJson : JSON.stringify(streakRewardsJson);
-      params.push(jsonStr);
-    }
-
     sql += ` WHERE id = 1`;
     await db.execute(sql, params);
 
@@ -1049,12 +1029,12 @@ async function updateReferralSettings(req, res) {
       action: 'UPDATE_REFERRAL_RULES',
       targetType: 'PLATFORM_SETTINGS',
       targetId: '1',
-      newValue: JSON.stringify({ referrerRewardCoins, refereeRewardCoins, referralTrigger, minSurveyRewardCoins, minWithdrawalCoins, adsgramBlockId, streakRewardCoins, streakRewardsJson }),
-      reason: 'Updated Platform, Adsgram & 7-Day Streak Rules',
+      newValue: JSON.stringify({ referrerRewardCoins, refereeRewardCoins, referralTrigger, minSurveyRewardCoins, minWithdrawalCoins, adsgramBlockId }),
+      reason: 'Updated Platform & Adsgram Rules',
       ip: req.clientIp || '127.0.0.1'
     });
 
-    return res.json({ success: true, message: 'Platform rules & 7-Day Streak configuration updated successfully!' });
+    return res.json({ success: true, message: 'Platform & Adsgram configuration updated successfully!' });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to update referral settings' });
   }
