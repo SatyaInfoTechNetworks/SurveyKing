@@ -31,7 +31,7 @@ function httpGet(url) {
 
 async function fetchLiveOffers(req, res) {
   try {
-    const url = `https://api.opinionuniverse.com/publisher/offersFeed?pubid=${OU_PUB_ID}&appid=${OU_APP_ID}&apikey=${OU_API_KEY}`;
+    const url = `https://api.opinionuniverse.com/publisher/offersFeed?key=${OU_API_KEY}&pubid=${OU_PUB_ID}&app_id=${OU_APP_ID}&type=live_surveys`;
     console.log('============================================');
     console.log('OU API REQUEST URL:', url);
     console.log('OU_PUB_ID:', OU_PUB_ID, '| OU_APP_ID:', OU_APP_ID);
