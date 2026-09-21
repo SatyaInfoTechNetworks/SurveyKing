@@ -15,6 +15,7 @@ import FraudPage from '../pages/Fraud';
 import AnalyticsPage from '../pages/Analytics';
 import SettingsPage from '../pages/Settings';
 import AuditLogsPage from '../pages/AuditLogs';
+import OpinionUniversePage from '../pages/OpinionUniverse';
 
 // Drawers & Modals
 import UserDrawer from '../components/UserDrawer';
@@ -573,6 +574,10 @@ export default function AdminLayout({ onExitAdmin }) {
 
           {activeTab === 'audit' && (
             <AuditLogsPage logs={auditLogs} />
+          )}
+
+          {activeTab === 'opinion_universe' && (
+            <OpinionUniversePage onNotify={(msg) => showNotification(msg)} />
           )}
         </main>
       </div>

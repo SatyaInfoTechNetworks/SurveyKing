@@ -363,6 +363,70 @@ async function createTables() {
   try { await mysqlPool.execute(`ALTER TABLE surveys ADD COLUMN start_date DATETIME DEFAULT NULL;`); } catch (e) {}
   try { await mysqlPool.execute(`ALTER TABLE surveys ADD COLUMN end_date DATETIME DEFAULT NULL;`); } catch (e) {}
 
+  // =====================================================
+  // Opinion Universe Provider-Agnostic Survey Table
+  // =====================================================
+  await mysqlPool.execute(`
+    CREATE TABLE IF NOT EXISTS opinion_universe_surveys (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      provider VARCHAR(50) NOT NULL DEFAULT 'opinion_universe',
+      external_offer_id VARCHAR(100) NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      description TEXT DEFAULT NULL,
+      survey_url_template TEXT NOT NULL,
+      image_url VARCHAR(500) DEFAULT NULL,
+      payout DECIMAL(10, 4) DEFAULT 0.0000,
+      currency VARCHAR(20) DEFAULT 'USD',
+      loi INT DEFAULT 0,
+      ir INT DEFAULT 0,
+      countries VARCHAR(255) DEFAULT 'All',
+      devices VARCHAR(100) DEFAULT 'All',
+      status VARCHAR(30) DEFAULT 'active',
+      is_featured TINYINT(1) DEFAULT 0,
+      coins_reward INT DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY unique_provider_offer (provider, external_offer_id)
+    ) ENGINE=InnoDB;
+  `);
+
+  // =====================================================
+  // Survey Clicks – Per-user click tracking
+  // =====================================================
+  await mysqlPool.execute(`
+    CREATE TABLE IF NOT EXISTS survey_clicks (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      click_id VARCHAR(150) UNIQUE NOT NULL,
+      user_id INT NOT NULL,
+      survey_id INT NOT NULL,
+      provider VARCHAR(50) NOT NULL,
+      external_offer_id VARCHAR(100) NOT NULL,
+      status VARCHAR(30) DEFAULT 'started',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      completed_at DATETIME DEFAULT NULL
+    ) ENGINE=InnoDB;
+  `);
+
+  // =====================================================
+  // Survey Conversions – Idempotent postback records
+  // =====================================================
+  await mysqlPool.execute(`
+    CREATE TABLE IF NOT EXISTS survey_conversions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      provider VARCHAR(50) NOT NULL,
+      conversion_id VARCHAR(200) NOT NULL,
+      click_id VARCHAR(150) NOT NULL,
+      user_id INT NOT NULL,
+      survey_id INT NOT NULL,
+      provider_payout DECIMAL(10, 4) DEFAULT 0.0000,
+      user_reward_coins INT DEFAULT 0,
+      status VARCHAR(30) DEFAULT 'credited',
+      raw_postback TEXT DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY unique_provider_conversion (provider, conversion_id)
+    ) ENGINE=InnoDB;
+  `);
+
   await seedDefaults();
   console.log(`✅ All MySQL database tables in 'surveyking' verified and ready!`);
 }

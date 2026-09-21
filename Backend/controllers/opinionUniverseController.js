@@ -1,0 +1,292 @@
+const db = require('../config/db');
+const https = require('https');
+const http = require('http');
+require('dotenv').config();
+
+const OU_PUB_ID = process.env.OU_PUB_ID || '1863';
+const OU_APP_ID = process.env.OU_APP_ID || 'ID_1c73aa4e879a0aab3555de6b40256fed';
+const OU_API_KEY = process.env.OU_API_KEY || '975ae2dffc8c54f77e8b4bde9c13f95707e4b4434f6bfa2';
+const OU_SOURCE = process.env.OU_SOURCE || 'survey_king';
+
+function generateClickId(userId, externalOfferId) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let rand = '';
+  for (let i = 0; i < 6; i++) rand += chars.charAt(Math.floor(Math.random() * chars.length));
+  return `SK_${userId}_${externalOfferId}_${rand}_${Date.now()}`;
+}
+
+function httpGet(url) {
+  return new Promise((resolve, reject) => {
+    const client = url.startsWith('https') ? https : http;
+    client.get(url, (res) => {
+      let data = '';
+      res.on('data', chunk => (data += chunk));
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch (e) { reject(new Error('Invalid JSON from Opinion Universe API')); }
+      });
+    }).on('error', reject);
+  });
+}
+
+async function fetchLiveOffers(req, res) {
+  try {
+    const url = `https://api.opinionuniverse.com/publisher/offersFeed?pubid=${OU_PUB_ID}&appid=${OU_APP_ID}&apikey=${OU_API_KEY}`;
+    console.log('Fetching Opinion Universe live offers...');
+    const data = await httpGet(url);
+    if (data.code !== 200 || data.message !== 'success') {
+      return res.status(502).json({ success: false, error: 'Opinion Universe API error', raw: data });
+    }
+    const offers = data?.data?.response?.offers || [];
+    return res.json({
+      success: true, count: offers.length,
+      currencyName: data?.data?.response?.currency_name || 'Points',
+      offers: offers.map(o => ({
+        offerId: o.offer_id, offerName: o.offer_name, offerDesc: o.offer_desc || null,
+        callToAction: o.call_to_action || null, offerUrlTemplate: o.offer_url_easy,
+        payout: parseFloat(o.payout || o.amount || 0), offerType: o.offer_type || 'Consumer',
+        imageUrl: o.image_url || null, loi: o.loi || 0, ir: o.ir || 0,
+        countries: o.countries || 'All', devices: o.devices || 'All'
+      }))
+    });
+  } catch (err) {
+    console.error('Error fetching OU offers:', err);
+    return res.status(500).json({ success: false, error: 'Failed to fetch offers: ' + err.message });
+  }
+}
+
+async function getAdminSurveys(req, res) {
+  try {
+    const rows = await db.query('SELECT * FROM opinion_universe_surveys WHERE status != ? ORDER BY is_featured DESC, created_at DESC', ['deleted']);
+    return res.json({ success: true, surveys: rows });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to fetch surveys' });
+  }
+}
+
+async function addSurvey(req, res) {
+  try {
+    const { offerId, offerName, offerDesc, offerUrlTemplate, imageUrl, payout, loi, ir, countries, devices, coinsReward } = req.body;
+    if (!offerId || !offerName || !offerUrlTemplate) {
+      return res.status(400).json({ success: false, error: 'offerId, offerName, and offerUrlTemplate are required' });
+    }
+    if (!offerUrlTemplate.includes('{YOUR_CLICK_ID}')) {
+      return res.status(400).json({ success: false, error: 'URL template must contain {YOUR_CLICK_ID}' });
+    }
+    const coins = parseInt(coinsReward, 10) || Math.round(parseFloat(payout || 0) * 10000);
+    await db.execute(
+      `INSERT INTO opinion_universe_surveys
+        (provider, external_offer_id, title, description, survey_url_template, image_url, payout, currency, loi, ir, countries, devices, status, is_featured, coins_reward)
+       VALUES ('opinion_universe', ?, ?, ?, ?, ?, ?, 'USD', ?, ?, ?, ?, 'active', 0, ?)
+       ON DUPLICATE KEY UPDATE
+         title=VALUES(title), description=VALUES(description), survey_url_template=VALUES(survey_url_template),
+         image_url=VALUES(image_url), payout=VALUES(payout), loi=VALUES(loi), ir=VALUES(ir),
+         countries=VALUES(countries), devices=VALUES(devices), coins_reward=VALUES(coins_reward),
+         status='active', updated_at=NOW()`,
+      [String(offerId), offerName, offerDesc || null, offerUrlTemplate, imageUrl || null,
+       parseFloat(payout || 0), parseInt(loi || 0), parseInt(ir || 0), countries || 'All', devices || 'All', coins]
+    );
+    return res.json({ success: true, message: `Survey "${offerName}" added to Survey King!` });
+  } catch (err) {
+    console.error('Error adding OU survey:', err);
+    return res.status(500).json({ success: false, error: 'Failed to add survey: ' + err.message });
+  }
+}
+
+async function updateSurveyStatus(req, res) {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    if (!['active', 'inactive'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Status must be active or inactive' });
+    }
+    await db.execute('UPDATE opinion_universe_surveys SET status = ? WHERE id = ?', [status, id]);
+    return res.json({ success: true, message: `Survey ${status === 'active' ? 'enabled' : 'disabled'}.` });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to update status' });
+  }
+}
+
+async function featureSurvey(req, res) {
+  try {
+    const { id } = req.params;
+    const { isFeatured } = req.body;
+    await db.execute('UPDATE opinion_universe_surveys SET is_featured = ? WHERE id = ?', [isFeatured ? 1 : 0, id]);
+    return res.json({ success: true, message: `Survey ${isFeatured ? 'featured' : 'unfeatured'}.` });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to update featured status' });
+  }
+}
+
+async function deleteSurvey(req, res) {
+  try {
+    const { id } = req.params;
+    await db.execute('UPDATE opinion_universe_surveys SET status = ? WHERE id = ?', ['deleted', id]);
+    return res.json({ success: true, message: 'Survey removed.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to delete survey' });
+  }
+}
+
+async function updateSurveyCoins(req, res) {
+  try {
+    const { id } = req.params;
+    const { coinsReward } = req.body;
+    await db.execute('UPDATE opinion_universe_surveys SET coins_reward = ? WHERE id = ?', [parseInt(coinsReward, 10) || 0, id]);
+    return res.json({ success: true, message: 'Coins reward updated.' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to update coins' });
+  }
+}
+
+async function getUserSurveyFeed(req, res) {
+  try {
+    const rows = await db.query(
+      `SELECT id, provider, external_offer_id, title, description, image_url, payout, loi, ir, countries, devices, is_featured, coins_reward
+       FROM opinion_universe_surveys WHERE status = 'active'
+       ORDER BY is_featured DESC, coins_reward DESC, created_at DESC`
+    );
+    return res.json({
+      success: true,
+      surveys: rows.map(s => ({
+        id: s.id, provider: s.provider, externalOfferId: s.external_offer_id,
+        title: s.title, description: s.description, imageUrl: s.image_url,
+        payout: parseFloat(s.payout), loi: s.loi, ir: s.ir,
+        countries: s.countries, devices: s.devices,
+        isFeatured: s.is_featured === 1, coinsReward: s.coins_reward
+      }))
+    });
+  } catch (err) {
+    console.error('Error fetching survey feed:', err);
+    return res.status(500).json({ success: false, error: 'Failed to fetch surveys' });
+  }
+}
+
+async function startSurvey(req, res) {
+  try {
+    const { surveyId } = req.params;
+    const telegramUserId = req.query.telegramUserId || req.body?.telegramUserId;
+    if (!telegramUserId) return res.status(400).json({ success: false, error: 'telegramUserId is required' });
+
+    const userRows = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [String(telegramUserId)]);
+    if (!userRows.length) return res.status(404).json({ success: false, error: 'User not found' });
+    const user = userRows[0];
+    if (user.status === 'BANNED') return res.status(403).json({ success: false, error: 'Account restricted' });
+
+    const surveyRows = await db.query('SELECT * FROM opinion_universe_surveys WHERE id = ?', [surveyId]);
+    if (!surveyRows.length) return res.status(404).json({ success: false, error: 'Survey not found' });
+    const survey = surveyRows[0];
+
+    if (survey.status !== 'active') return res.status(400).json({ success: false, error: 'Survey not available' });
+    if (!survey.survey_url_template?.includes('{YOUR_CLICK_ID}')) {
+      return res.status(500).json({ success: false, error: 'Invalid survey URL template' });
+    }
+
+    const clickId = generateClickId(user.id, survey.external_offer_id);
+    await db.execute(
+      `INSERT INTO survey_clicks (click_id, user_id, survey_id, provider, external_offer_id, status)
+       VALUES (?, ?, ?, ?, ?, 'started')`,
+      [clickId, user.id, survey.id, survey.provider, survey.external_offer_id]
+    );
+
+    const finalUrl = survey.survey_url_template
+      .replace(/{YOUR_CLICK_ID}/g, clickId)
+      .replace(/{YOUR_SOURCE_ID}/g, OU_SOURCE);
+
+    console.log(`Survey Start: User ${user.id} -> ${survey.id} -> ${clickId}`);
+    return res.redirect(302, finalUrl);
+  } catch (err) {
+    console.error('Error starting survey:', err);
+    return res.status(500).json({ success: false, error: 'Failed to start survey' });
+  }
+}
+
+async function handlePostback(req, res) {
+  const raw = JSON.stringify(req.query);
+  try {
+    const { sid: clickId, status, payout, trans_id: transId } = req.query;
+    console.log('OU Postback:', req.query);
+
+    if (!clickId) return res.status(200).send('MISSING_CLICK_ID');
+    if (String(status) !== '1') return res.status(200).send('NON_COMPLETION_IGNORED');
+
+    const conversionId = transId ? String(transId) : `${clickId}_${Date.now()}`;
+
+    const existing = await db.query('SELECT id FROM survey_conversions WHERE provider = ? AND conversion_id = ?', ['opinion_universe', conversionId]);
+    if (existing.length > 0) return res.status(200).send('DUPLICATE_IGNORED');
+
+    const clickRows = await db.query('SELECT * FROM survey_clicks WHERE click_id = ?', [clickId]);
+    if (!clickRows.length) return res.status(200).send('CLICK_NOT_FOUND');
+    const click = clickRows[0];
+
+    const userRows = await db.query('SELECT * FROM users WHERE id = ?', [click.user_id]);
+    if (!userRows.length) return res.status(200).send('USER_NOT_FOUND');
+    const user = userRows[0];
+
+    const surveyRows = await db.query('SELECT * FROM opinion_universe_surveys WHERE id = ?', [click.survey_id]);
+    const survey = surveyRows[0] || null;
+    const rewardCoins = survey ? (survey.coins_reward || 0) : 0;
+    const providerPayout = parseFloat(payout || 0);
+
+    if (rewardCoins > 0) {
+      const newBalance = parseFloat(user.balance || 0) + rewardCoins;
+      await db.execute('UPDATE users SET balance = ? WHERE id = ?', [newBalance, user.id]);
+      await db.execute(
+        `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
+         VALUES (?, 'SURVEY_REWARD', ?, ?, ?)`,
+        [user.id, rewardCoins, `OU_${conversionId}`, `Opinion Universe Survey Reward (+${rewardCoins} Coins)`]
+      );
+    }
+
+    await db.execute(
+      `INSERT INTO survey_conversions (provider, conversion_id, click_id, user_id, survey_id, provider_payout, user_reward_coins, status, raw_postback)
+       VALUES ('opinion_universe', ?, ?, ?, ?, ?, ?, 'credited', ?)`,
+      [conversionId, clickId, user.id, click.survey_id, providerPayout, rewardCoins, raw]
+    );
+
+    await db.execute('UPDATE survey_clicks SET status = ?, completed_at = NOW() WHERE click_id = ?', ['completed', clickId]);
+
+    console.log(`OU Postback: +${rewardCoins} coins -> User ${user.id} | Conv: ${conversionId}`);
+    return res.status(200).send('OK');
+  } catch (err) {
+    console.error('Error handling OU postback:', err);
+    return res.status(500).send('SERVER_ERROR');
+  }
+}
+
+async function getAdminSurveyClicks(req, res) {
+  try {
+    const rows = await db.query(
+      `SELECT sc.*, u.name AS user_name, u.telegram_user_id, ous.title AS survey_title
+       FROM survey_clicks sc
+       LEFT JOIN users u ON sc.user_id = u.id
+       LEFT JOIN opinion_universe_surveys ous ON sc.survey_id = ous.id
+       ORDER BY sc.created_at DESC LIMIT 500`
+    );
+    return res.json({ success: true, clicks: rows });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to fetch clicks' });
+  }
+}
+
+async function getAdminConversions(req, res) {
+  try {
+    const rows = await db.query(
+      `SELECT sc.*, u.name AS user_name, u.telegram_user_id, ous.title AS survey_title
+       FROM survey_conversions sc
+       LEFT JOIN users u ON sc.user_id = u.id
+       LEFT JOIN opinion_universe_surveys ous ON sc.survey_id = ous.id
+       ORDER BY sc.created_at DESC LIMIT 500`
+    );
+    return res.json({ success: true, conversions: rows });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Failed to fetch conversions' });
+  }
+}
+
+module.exports = {
+  fetchLiveOffers, getAdminSurveys, addSurvey, updateSurveyStatus,
+  featureSurvey, deleteSurvey, updateSurveyCoins, getUserSurveyFeed,
+  startSurvey, handlePostback, getAdminSurveyClicks, getAdminConversions
+};
+

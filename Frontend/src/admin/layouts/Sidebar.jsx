@@ -14,7 +14,8 @@ import {
   Settings,
   Crown,
   ChevronRight,
-  LogOut
+  LogOut,
+  Globe
 } from 'lucide-react';
 
 export default function Sidebar({ activeTab, onSelectTab, onExitAdmin, pendingCount = 0 }) {
@@ -44,7 +45,8 @@ export default function Sidebar({ activeTab, onSelectTab, onExitAdmin, pendingCo
       label: 'INTEGRATIONS',
       items: [
         { id: 'postbacks', label: 'Postbacks & Logs', icon: Radio },
-        { id: 'telegram', label: 'Telegram Bot', icon: Bot }
+        { id: 'telegram', label: 'Telegram Bot', icon: Bot },
+        { id: 'opinion_universe', label: 'Opinion Universe', icon: Globe }
       ]
     },
     {

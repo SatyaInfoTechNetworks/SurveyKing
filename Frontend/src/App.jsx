@@ -23,6 +23,7 @@ export default function App() {
   });
   const [user, setUser] = useState(null);
   const [surveys, setSurveys] = useState([]);
+  const [ouSurveys, setOuSurveys] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [referrals, setReferrals] = useState([]);
   const [activeParticipation, setActiveParticipation] = useState(null);
@@ -108,6 +109,13 @@ export default function App() {
         if (sData.cpxOfferwallUrl) setCpxOfferwallUrl(sData.cpxOfferwallUrl);
       }
 
+      // 1b. Fetch Opinion Universe survey feed
+      try {
+        const ouRes = await fetch('/api/surveys');
+        const ouData = await ouRes.json();
+        if (ouData.success) setOuSurveys(ouData.surveys || []);
+      } catch (_) {}
+
       // 2. Fetch User Me
       const uRes = await fetch(`/api/telegram/me?telegramUserId=${tgUserId}`);
       const uData = await uRes.json();
@@ -139,6 +147,14 @@ export default function App() {
   // Start Survey Handler
   const handleStartSurvey = async (survey) => {
     try {
+      // Opinion Universe surveys: route through backend for click tracking
+      if (survey.provider === 'opinion_universe' && survey.id) {
+        const startUrl = `/api/surveys/${survey.id}/start?telegramUserId=${user?.telegramUserId || ''}`;
+        window.open(startUrl, '_blank');
+        return;
+      }
+
+      // CPX / other providers: open URL directly
       const surveyUrl = survey.href || survey.providerUrl || (survey.id ? `https://live-api.cpx-research.com/index.php?app_id=35805&ext_user_id=${user?.telegramUserId || '1981634693'}&survey_id=${survey.id}` : null);
       if (surveyUrl) {
         window.open(surveyUrl, '_blank');
@@ -268,6 +284,7 @@ export default function App() {
           {activeTab === 'surveys' && (
             <SurveysTab
               surveys={surveys}
+              ouSurveys={ouSurveys}
               onStartSurvey={handleStartSurvey}
             />
           )}

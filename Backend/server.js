@@ -7,6 +7,7 @@ const db = require('./config/db');
 const telegramController = require('./controllers/telegramController');
 const webhookController = require('./controllers/webhookController');
 const adminController = require('./controllers/adminController');
+const ouController = require('./controllers/opinionUniverseController');
 const { initBot } = require('./bot/telegramBot');
 
 const app = express();
@@ -110,6 +111,14 @@ app.all('/api/webhooks/cpx', webhookController.handleWebhook);
 app.all('/api/webhooks/surveys/cpx', webhookController.handleWebhook);
 app.all('/api/webhooks/surveys/:provider', webhookController.handleWebhook);
 
+// Opinion Universe Postback (before admin routes to ensure priority)
+app.get('/api/postback/opinion-universe', ouController.handlePostback);
+app.get('/postback/opinion-universe', ouController.handlePostback);
+
+// User Survey Feed & Start (Opinion Universe)
+app.get('/api/surveys', ouController.getUserSurveyFeed);
+app.get('/api/surveys/:surveyId/start', ouController.startSurvey);
+
 // Admin APIs (All 12 Modules)
 // 1. Dashboard
 app.get('/api/admin/dashboard', adminController.getDashboardStats);
@@ -162,6 +171,17 @@ app.post('/api/admin/fraud/flags/:id/resolve', adminController.resolveFraudFlag)
 
 // 10. Analytics
 app.get('/api/admin/analytics', adminController.getAnalytics);
+
+// 13. Opinion Universe Integration
+app.get('/api/admin/opinion-universe/fetch', ouController.fetchLiveOffers);
+app.get('/api/admin/opinion-universe/surveys', ouController.getAdminSurveys);
+app.post('/api/admin/opinion-universe/surveys', ouController.addSurvey);
+app.put('/api/admin/opinion-universe/surveys/:id/status', ouController.updateSurveyStatus);
+app.put('/api/admin/opinion-universe/surveys/:id/feature', ouController.featureSurvey);
+app.put('/api/admin/opinion-universe/surveys/:id/coins', ouController.updateSurveyCoins);
+app.delete('/api/admin/opinion-universe/surveys/:id', ouController.deleteSurvey);
+app.get('/api/admin/opinion-universe/clicks', ouController.getAdminSurveyClicks);
+app.get('/api/admin/opinion-universe/conversions', ouController.getAdminConversions);
 
 // 11. Audit Logs
 app.get('/api/admin/audit-logs', adminController.getAuditLogs);
