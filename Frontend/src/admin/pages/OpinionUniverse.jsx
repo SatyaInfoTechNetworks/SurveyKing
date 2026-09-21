@@ -164,7 +164,8 @@ export default function OpinionUniversePage({ onNotify }) {
           offerId: offer.offerId, offerName: offer.offerName, offerDesc: offer.offerDesc,
           offerUrlTemplate: offer.offerUrlTemplate, imageUrl: offer.imageUrl,
           payout: offer.payout, loi: offer.loi, ir: offer.ir,
-          countries: offer.countries, devices: offer.devices
+          countries: offer.countries, devices: offer.devices,
+          coinsReward: offer.amount || Math.round((offer.payout || 0) * 4500)
         })
       });
       const data = await res.json();
@@ -399,9 +400,10 @@ export default function OpinionUniversePage({ onNotify }) {
                 <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', marginBottom: '4px' }}>{offer.offerName}</div>
                 {offer.offerDesc && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted, #94a3b8)', marginBottom: '8px' }}>{offer.offerDesc}</div>}
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '8px', marginBottom: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '8px', marginBottom: '12px' }}>
                   {[
-                    { label: 'Payout', value: `$${offer.payout?.toFixed(3)}`, color: '#10b981' },
+                    { label: 'Publisher ($)', value: `$${offer.payout?.toFixed(3)}`, color: '#10b981' },
+                    { label: 'User Coins', value: `${(offer.amount || Math.round((offer.payout || 0) * 4500)).toLocaleString()} 🪙`, color: '#eab308' },
                     { label: 'LOI', value: `${offer.loi} mins`, color: '#f59e0b' },
                     { label: 'IR', value: `${offer.ir}%`, color: '#6366f1' },
                     { label: 'Devices', value: offer.devices, color: '#94a3b8' }

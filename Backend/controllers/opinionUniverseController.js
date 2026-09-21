@@ -94,11 +94,20 @@ async function fetchLiveOffers(req, res) {
       currencyName: data?.data?.response?.currency_name || data?.data?.currency_name || 'Points',
       filtersApplied: { country, platform, type, payoutType },
       offers: offersRaw.map(o => ({
-        offerId: o.offer_id, offerName: o.offer_name, offerDesc: o.offer_desc || null,
-        callToAction: o.call_to_action || null, offerUrlTemplate: o.offer_url_easy || o.offer_url || '',
-        payout: parseFloat(o.payout || o.amount || 0), offerType: o.offer_type || 'Consumer',
-        imageUrl: o.image_url || null, loi: o.loi || 0, ir: o.ir || 0,
-        countries: o.countries || country, devices: o.devices || platform
+        offerId: o.offer_id,
+        offerName: o.offer_name,
+        offerDesc: o.offer_desc || null,
+        callToAction: o.call_to_action || null,
+        offerUrlTemplate: o.offer_url_easy || o.offer_url || '',
+        payout: parseFloat(o.payout || 0),
+        amount: Math.round(parseFloat(o.amount || 0)) || Math.round(parseFloat(o.payout || 0) * 4500),
+        payoutType: o.payoutType || 'flat',
+        offerType: o.offer_type || 'Consumer',
+        imageUrl: o.image_url || null,
+        loi: o.loi || 0,
+        ir: o.ir || 0,
+        countries: o.countries || country,
+        devices: o.devices || platform
       }))
     });
   } catch (err) {
@@ -126,7 +135,7 @@ async function addSurvey(req, res) {
     if (!offerUrlTemplate.includes('{YOUR_CLICK_ID}')) {
       return res.status(400).json({ success: false, error: 'URL template must contain {YOUR_CLICK_ID}' });
     }
-    const coins = parseInt(coinsReward, 10) || Math.round(parseFloat(payout || 0) * 10000);
+    const coins = parseInt(coinsReward, 10) || Math.round(parseFloat(payout || 0) * 4500);
     await db.execute(
       `INSERT INTO opinion_universe_surveys
         (provider, external_offer_id, title, description, survey_url_template, image_url, payout, currency, loi, ir, countries, devices, status, is_featured, coins_reward)
