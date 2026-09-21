@@ -425,6 +425,8 @@ async function createTables() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       UNIQUE KEY unique_provider_conversion (provider, conversion_id)
     ) ENGINE=InnoDB;
+  `);
+
   try { await mysqlPool.execute('ALTER TABLE opinion_universe_surveys ADD COLUMN qualification_tips TEXT DEFAULT NULL;'); } catch (e) {}
   try { await mysqlPool.execute('ALTER TABLE opinion_universe_surveys ADD COLUMN extra_info TEXT DEFAULT NULL;'); } catch (e) {}
 
