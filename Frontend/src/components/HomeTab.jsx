@@ -1,8 +1,30 @@
 import React from 'react';
 import { Sparkles, TrendingUp, ShieldCheck, Play, ArrowRight, Zap, Coins, Clock, Trophy, ChevronRight } from 'lucide-react';
 
-export default function HomeTab({ user, surveys, clickedSurveys = {}, onStartSurvey, onNavigate }) {
-  const availableSurveys = (surveys || []).filter(s => {
+export default function HomeTab({ user, surveys = [], ouSurveys = [], clickedSurveys = {}, onStartSurvey, onNavigate }) {
+  // Normalize OU surveys to render properly on Home
+  const ouNormalized = (ouSurveys || []).map(s => ({
+    ...s,
+    id: s.id,
+    surveyId: `ou_${s.id}`,
+    title: s.title,
+    reward: s.coinsReward,
+    estimatedMinutes: s.loi || 0,
+    category: 'General',
+    icon: '🌐',
+    provider: 'opinion_universe',
+    providerName: 'Opinion Universe',
+    _type: 'ou',
+    isFeatured: s.isFeatured || false
+  })).sort((a, b) => {
+    if (b.isFeatured !== a.isFeatured) return b.isFeatured ? 1 : -1;
+    return (b.reward || 0) - (a.reward || 0);
+  });
+
+  // Opinion Universe surveys ALWAYS on top of everything!
+  const allSurveys = [...ouNormalized, ...(surveys || [])];
+
+  const availableSurveys = allSurveys.filter(s => {
     const rawId = String(s.id || s.surveyId || '').replace('ou_', '');
     const clickTime = clickedSurveys[rawId] || clickedSurveys[String(s.surveyId)] || clickedSurveys[String(s.id)];
     return !clickTime || (Date.now() - clickTime) < 60000;

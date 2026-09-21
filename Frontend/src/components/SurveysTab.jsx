@@ -38,10 +38,14 @@ export default function SurveysTab({ surveys, ouSurveys = [], clickedSurveys = {
     isFeatured: s.isFeatured || false
   }));
 
-  // Merge: Featured OU first, then rest
-  const allFeatured = [...cpxNormalized, ...ouNormalized].filter(s => s.isFeatured);
-  const allNonFeatured = [...cpxNormalized, ...ouNormalized].filter(s => !s.isFeatured);
-  const allSurveys = [...allFeatured, ...allNonFeatured];
+  // Sort OU surveys: Featured first, then highest coins reward
+  const ouSorted = [...ouNormalized].sort((a, b) => {
+    if (b.isFeatured !== a.isFeatured) return b.isFeatured ? 1 : -1;
+    return (b.coinsReward || 0) - (a.coinsReward || 0);
+  });
+
+  // Opinion Universe surveys ALWAYS on the top of everything!
+  const allSurveys = [...ouSorted, ...cpxNormalized];
 
   const providerFilters = ['ALL', 'CPX Research', 'Opinion Universe'];
 

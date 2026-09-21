@@ -305,6 +305,7 @@ export default function App() {
             <HomeTab
               user={user}
               surveys={surveys}
+              ouSurveys={ouSurveys}
               clickedSurveys={clickedSurveys}
               onStartSurvey={handleStartSurvey}
               onNavigate={(tab) => setActiveTab(tab)}
