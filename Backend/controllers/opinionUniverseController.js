@@ -99,8 +99,8 @@ async function fetchLiveOffers(req, res) {
         offerDesc: o.offer_desc || null,
         callToAction: o.call_to_action || null,
         offerUrlTemplate: o.offer_url_easy || o.offer_url || '',
+        amount: Math.round(parseFloat(o.amount || 0)),
         payout: parseFloat(o.payout || 0),
-        amount: Math.round(parseFloat(o.amount || 0)) || Math.round(parseFloat(o.payout || 0) * 4500),
         payoutType: o.payoutType || 'flat',
         offerType: o.offer_type || 'Consumer',
         imageUrl: o.image_url || null,
@@ -128,25 +128,25 @@ async function getAdminSurveys(req, res) {
 
 async function addSurvey(req, res) {
   try {
-    const { offerId, offerName, offerDesc, offerUrlTemplate, imageUrl, payout, loi, ir, countries, devices, coinsReward } = req.body;
+    const { offerId, offerName, offerDesc, offerUrlTemplate, imageUrl, amount, payout, loi, ir, countries, devices, coinsReward } = req.body;
     if (!offerId || !offerName || !offerUrlTemplate) {
       return res.status(400).json({ success: false, error: 'offerId, offerName, and offerUrlTemplate are required' });
     }
     if (!offerUrlTemplate.includes('{YOUR_CLICK_ID}')) {
       return res.status(400).json({ success: false, error: 'URL template must contain {YOUR_CLICK_ID}' });
     }
-    const coins = parseInt(coinsReward, 10) || Math.round(parseFloat(payout || 0) * 4500);
+    const coins = parseInt(coinsReward, 10) || Math.round(parseFloat(amount || 0));
     await db.execute(
       `INSERT INTO opinion_universe_surveys
         (provider, external_offer_id, title, description, survey_url_template, image_url, payout, currency, loi, ir, countries, devices, status, is_featured, coins_reward)
-       VALUES ('opinion_universe', ?, ?, ?, ?, ?, ?, 'USD', ?, ?, ?, ?, 'active', 0, ?)
+       VALUES ('opinion_universe', ?, ?, ?, ?, ?, ?, 'coins', ?, ?, ?, ?, 'active', 0, ?)
        ON DUPLICATE KEY UPDATE
          title=VALUES(title), description=VALUES(description), survey_url_template=VALUES(survey_url_template),
          image_url=VALUES(image_url), payout=VALUES(payout), loi=VALUES(loi), ir=VALUES(ir),
          countries=VALUES(countries), devices=VALUES(devices), coins_reward=VALUES(coins_reward),
          status='active', updated_at=NOW()`,
       [String(offerId), offerName, offerDesc || null, offerUrlTemplate, imageUrl || null,
-       parseFloat(payout || 0), parseInt(loi || 0), parseInt(ir || 0), countries || 'All', devices || 'All', coins]
+       parseFloat(payout || amount || 0), parseInt(loi || 0), parseInt(ir || 0), countries || 'All', devices || 'All', coins]
     );
     return res.json({ success: true, message: `Survey "${offerName}" added to Survey King!` });
   } catch (err) {

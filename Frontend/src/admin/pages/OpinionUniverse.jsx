@@ -90,7 +90,7 @@ export default function OpinionUniversePage({ onNotify }) {
   const [filterPlatform, setFilterPlatform] = useState('All');
   const [filterType, setFilterType] = useState('live_surveys');
   const [filterPayoutType, setFilterPayoutType] = useState('All');
-  const [filterMinPayout, setFilterMinPayout] = useState('');
+  const [filterMinAmount, setFilterMinAmount] = useState('');
   const [filterMaxLoi, setFilterMaxLoi] = useState('');
   const [filterMinIr, setFilterMinIr] = useState('');
 
@@ -163,9 +163,9 @@ export default function OpinionUniversePage({ onNotify }) {
         body: JSON.stringify({
           offerId: offer.offerId, offerName: offer.offerName, offerDesc: offer.offerDesc,
           offerUrlTemplate: offer.offerUrlTemplate, imageUrl: offer.imageUrl,
-          payout: offer.payout, loi: offer.loi, ir: offer.ir,
+          amount: offer.amount, payout: offer.payout, loi: offer.loi, ir: offer.ir,
           countries: offer.countries, devices: offer.devices,
-          coinsReward: offer.amount || Math.round((offer.payout || 0) * 4500)
+          coinsReward: offer.amount
         })
       });
       const data = await res.json();
@@ -217,10 +217,10 @@ export default function OpinionUniversePage({ onNotify }) {
   const filteredOffers = liveOffers.filter(o => {
     const term = searchTerm.toLowerCase();
     const matchSearch = !searchTerm || String(o.offerId).includes(term) || o.offerName?.toLowerCase().includes(term);
-    const matchPayout = !filterMinPayout || parseFloat(o.payout) >= parseFloat(filterMinPayout);
+    const matchAmount = !filterMinAmount || Number(o.amount || 0) >= parseInt(filterMinAmount, 10);
     const matchLoi    = !filterMaxLoi    || parseInt(o.loi)     <= parseInt(filterMaxLoi);
     const matchIr     = !filterMinIr     || parseInt(o.ir)      >= parseInt(filterMinIr);
-    return matchSearch && matchPayout && matchLoi && matchIr;
+    return matchSearch && matchAmount && matchLoi && matchIr;
   });
 
   const subTabs = [
@@ -310,11 +310,11 @@ export default function OpinionUniversePage({ onNotify }) {
                 </select>
               </div>
 
-              {/* Min Payout (client-side) */}
+              {/* Min Amount (client-side) */}
               <div>
-                <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, marginBottom: '5px' }}>MIN PAYOUT ($)</div>
-                <input type="number" min="0" step="0.001" placeholder="e.g. 0.5"
-                  value={filterMinPayout} onChange={e => setFilterMinPayout(e.target.value)}
+                <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, marginBottom: '5px' }}>MIN AMOUNT (COINS)</div>
+                <input type="number" min="0" placeholder="e.g. 1000"
+                  value={filterMinAmount} onChange={e => setFilterMinAmount(e.target.value)}
                   style={{ ...inputStyle, padding: '8px 12px' }} />
               </div>
 
@@ -346,7 +346,7 @@ export default function OpinionUniversePage({ onNotify }) {
                   style={{ ...inputStyle, paddingLeft: '34px' }}
                 />
               </div>
-              <button onClick={() => { setFilterCountry('All'); setFilterPlatform('All'); setFilterType('live_surveys'); setFilterPayoutType('All'); setFilterMinPayout(''); setFilterMaxLoi(''); setFilterMinIr(''); setSearchTerm(''); }}
+              <button onClick={() => { setFilterCountry('All'); setFilterPlatform('All'); setFilterType('live_surveys'); setFilterPayoutType('All'); setFilterMinAmount(''); setFilterMaxLoi(''); setFilterMinIr(''); setSearchTerm(''); }}
                 style={{ ...btnSecondary, whiteSpace: 'nowrap' }}>
                 ✕ Reset
               </button>
@@ -402,8 +402,7 @@ export default function OpinionUniversePage({ onNotify }) {
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '8px', marginBottom: '12px' }}>
                   {[
-                    { label: 'Publisher ($)', value: `$${offer.payout?.toFixed(3)}`, color: '#10b981' },
-                    { label: 'User Coins', value: `${(offer.amount || Math.round((offer.payout || 0) * 4500)).toLocaleString()} 🪙`, color: '#eab308' },
+                    { label: 'Amount', value: `${(offer.amount || 0).toLocaleString()}`, color: '#10b981' },
                     { label: 'LOI', value: `${offer.loi} mins`, color: '#f59e0b' },
                     { label: 'IR', value: `${offer.ir}%`, color: '#6366f1' },
                     { label: 'Devices', value: offer.devices, color: '#94a3b8' }
@@ -459,7 +458,7 @@ export default function OpinionUniversePage({ onNotify }) {
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
                       ID: <strong style={{ color: '#a5b4fc' }}>{s.external_offer_id}</strong> &nbsp;•&nbsp;
-                      Payout: <strong style={{ color: '#10b981' }}>${parseFloat(s.payout).toFixed(3)}</strong> &nbsp;•&nbsp;
+                      Amount: <strong style={{ color: '#10b981' }}>{(s.coins_reward || 0).toLocaleString()}</strong> &nbsp;•&nbsp;
                       LOI: <strong style={{ color: '#f59e0b' }}>{s.loi} min</strong> &nbsp;•&nbsp;
                       {s.countries}
                     </div>
