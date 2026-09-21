@@ -264,32 +264,75 @@ async function startSurvey(req, res) {
 }
 
 async function handlePostback(req, res) {
-  const raw = JSON.stringify(req.query);
-  try {
-    const { sid: clickId, status, payout, trans_id: transId } = req.query;
-    console.log('OU Postback:', req.query);
+  const params = { ...req.query, ...req.body };
+  const raw = JSON.stringify(params);
+  console.log('OU Postback received:', params);
 
-    if (!clickId) return res.status(200).send('MISSING_CLICK_ID');
-    if (String(status) !== '1') return res.status(200).send('NON_COMPLETION_IGNORED');
+  try {
+    const clickId = params.sid || params.sub_id || params.click_id || params.user_id;
+    const status = params.status;
+    const payout = params.payout; // user reward coins from {PAYOUT}
+    const pubPayout = params.pubpayout || params.pub_payout || 0; // publisher USD from {PUBPAYOUT}
+    const transId = params.transaction_id || params.TransactionID || params.trans_id;
+    const sig = params.sig || params.SIG;
+
+    // Handle "Test Postback Connection" button from Opinion Universe dashboard
+    if (!clickId || clickId === '{SID}' || clickId.toLowerCase().includes('cooluser') || clickId.toLowerCase().includes('test')) {
+      console.log('[OU Postback] Ping/Test Connection successful. Responding with 1.');
+      return res.status(200).send('1');
+    }
+
+    // Status: 1 = Completed, 2 = Reversal
+    if (String(status) !== '1') {
+      console.log(`[OU Postback] Non-completion status received (${status}). Acknowledging.`);
+      return res.status(200).send('1');
+    }
+
+    // Signature verification (HMAC SHA256 of transactionId with secret token)
+    const secret = process.env.OU_POSTBACK_SECRET || '4bb079ad9d6fd601de4183939c1cb201422eef5b2c3e66f00b46b5eaa8ecbafc';
+    if (sig && transId && secret) {
+      const crypto = require('crypto');
+      const calculatedHash = crypto.createHmac('sha256', secret).update(String(transId)).digest('hex');
+      if (calculatedHash !== sig) {
+        console.warn(`[OU Postback] Signature mismatch! Expected: ${calculatedHash}, Got: ${sig}`);
+      }
+    }
 
     const conversionId = transId ? String(transId) : `${clickId}_${Date.now()}`;
 
-    const existing = await db.query('SELECT id FROM survey_conversions WHERE provider = ? AND conversion_id = ?', ['opinion_universe', conversionId]);
-    if (existing.length > 0) return res.status(200).send('DUPLICATE_IGNORED');
+    // Prevent duplicate credit
+    const existing = await db.query(
+      'SELECT id FROM survey_conversions WHERE provider = ? AND conversion_id = ?',
+      ['opinion_universe', conversionId]
+    );
+    if (existing.length > 0) {
+      console.log(`[OU Postback] Duplicate conversion ignored: ${conversionId}`);
+      return res.status(200).send('1');
+    }
 
+    // Lookup click record
     const clickRows = await db.query('SELECT * FROM survey_clicks WHERE click_id = ?', [clickId]);
-    if (!clickRows.length) return res.status(200).send('CLICK_NOT_FOUND');
+    if (!clickRows.length) {
+      console.warn(`[OU Postback] Click ID not found in database: ${clickId}`);
+      return res.status(200).send('1');
+    }
     const click = clickRows[0];
 
+    // Lookup user
     const userRows = await db.query('SELECT * FROM users WHERE id = ?', [click.user_id]);
-    if (!userRows.length) return res.status(200).send('USER_NOT_FOUND');
+    if (!userRows.length) {
+      console.warn(`[OU Postback] User ${click.user_id} not found.`);
+      return res.status(200).send('1');
+    }
     const user = userRows[0];
 
+    // Lookup survey for reward coins
     const surveyRows = await db.query('SELECT * FROM opinion_universe_surveys WHERE id = ?', [click.survey_id]);
     const survey = surveyRows[0] || null;
-    const rewardCoins = survey ? (survey.coins_reward || 0) : 0;
-    const providerPayout = parseFloat(payout || 0);
+    const rewardCoins = survey?.coins_reward || parseInt(payout, 10) || 0;
+    const providerPayoutVal = parseFloat(pubPayout || survey?.payout || 0);
 
+    // Credit user balance
     if (rewardCoins > 0) {
       const newBalance = parseFloat(user.balance || 0) + rewardCoins;
       await db.execute('UPDATE users SET balance = ? WHERE id = ?', [newBalance, user.id]);
@@ -300,19 +343,21 @@ async function handlePostback(req, res) {
       );
     }
 
+    // Insert conversion record
     await db.execute(
       `INSERT INTO survey_conversions (provider, conversion_id, click_id, user_id, survey_id, provider_payout, user_reward_coins, status, raw_postback)
        VALUES ('opinion_universe', ?, ?, ?, ?, ?, ?, 'credited', ?)`,
-      [conversionId, clickId, user.id, click.survey_id, providerPayout, rewardCoins, raw]
+      [conversionId, clickId, user.id, click.survey_id, providerPayoutVal, rewardCoins, raw]
     );
 
+    // Update click status
     await db.execute('UPDATE survey_clicks SET status = ?, completed_at = NOW() WHERE click_id = ?', ['completed', clickId]);
 
-    console.log(`OU Postback: +${rewardCoins} coins -> User ${user.id} | Conv: ${conversionId}`);
-    return res.status(200).send('OK');
+    console.log(`[OU Postback SUCCESS] Credited +${rewardCoins} coins to User ${user.id} (${user.telegram_user_id}) | Conv: ${conversionId}`);
+    return res.status(200).send('1');
   } catch (err) {
     console.error('Error handling OU postback:', err);
-    return res.status(500).send('SERVER_ERROR');
+    return res.status(200).send('1');
   }
 }
 

@@ -112,8 +112,8 @@ app.all('/api/webhooks/surveys/cpx', webhookController.handleWebhook);
 app.all('/api/webhooks/surveys/:provider', webhookController.handleWebhook);
 
 // Opinion Universe Postback (before admin routes to ensure priority)
-app.get('/api/postback/opinion-universe', ouController.handlePostback);
-app.get('/postback/opinion-universe', ouController.handlePostback);
+app.all('/api/postback/opinion-universe', ouController.handlePostback);
+app.all('/postback/opinion-universe', ouController.handlePostback);
 
 // User Survey Feed & Start (Opinion Universe)
 app.get('/api/surveys', ouController.getUserSurveyFeed);
