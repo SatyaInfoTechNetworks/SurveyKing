@@ -248,11 +248,42 @@ async function updateSurveyExtraInfo(req, res) {
 
 async function getUserSurveyFeed(req, res) {
   try {
-    const rows = await db.query(
-      `SELECT id, provider, external_offer_id, title, description, image_url, payout, loi, ir, countries, devices, is_featured, coins_reward, qualification_tips, extra_info
-       FROM opinion_universe_surveys WHERE status = 'active'
-       ORDER BY is_featured DESC, coins_reward DESC, created_at DESC`
-    );
+    const tgUserId = req.query.telegramUserId ? String(req.query.telegramUserId).trim() : null;
+    let excludedSurveyIds = [];
+    let excludedOfferIds = [];
+
+    if (tgUserId) {
+      const userRows = await db.query('SELECT id FROM users WHERE telegram_user_id = ?', [tgUserId]);
+      if (userRows.length > 0) {
+        const userId = userRows[0].id;
+        const clickedRows = await db.query(
+          'SELECT DISTINCT survey_id, external_offer_id FROM survey_clicks WHERE user_id = ?',
+          [userId]
+        );
+        excludedSurveyIds = clickedRows.map(r => r.survey_id).filter(Boolean);
+        excludedOfferIds = clickedRows.map(r => r.external_offer_id).filter(Boolean);
+      }
+    }
+
+    let queryStr = `
+      SELECT id, provider, external_offer_id, title, description, image_url, payout, loi, ir, countries, devices, is_featured, coins_reward, qualification_tips, extra_info
+      FROM opinion_universe_surveys
+      WHERE status = 'active'
+    `;
+    const queryParams = [];
+
+    if (excludedSurveyIds.length > 0) {
+      queryStr += ` AND id NOT IN (${excludedSurveyIds.map(() => '?').join(',')})`;
+      queryParams.push(...excludedSurveyIds);
+    }
+    if (excludedOfferIds.length > 0) {
+      queryStr += ` AND external_offer_id NOT IN (${excludedOfferIds.map(() => '?').join(',')})`;
+      queryParams.push(...excludedOfferIds);
+    }
+
+    queryStr += ` ORDER BY is_featured DESC, coins_reward DESC, created_at DESC`;
+
+    const rows = await db.query(queryStr, queryParams);
     return res.json({
       success: true,
       surveys: rows.map(s => ({

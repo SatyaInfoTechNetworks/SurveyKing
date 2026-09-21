@@ -31,6 +31,12 @@ export default function App() {
   const [payoutMethods, setPayoutMethods] = useState([]);
   const [referralSettings, setReferralSettings] = useState({ referrerRewardCoins: 1000, refereeRewardCoins: 500, referralTrigger: 'FIRST_SURVEY' });
   const [loading, setLoading] = useState(true);
+  const [clickedSurveys, setClickedSurveys] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sk_clicked_surveys');
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
 
   // Initialize Telegram WebApp & Authenticate
   useEffect(() => {
@@ -68,16 +74,20 @@ export default function App() {
       }
     }
 
-    authenticateUser(tgUser, startParam);
+    // Direct bypass/fallback for browser testing or Telegram WebApp
+    const userId = tgUser?.id ? String(tgUser.id) : '1981634693';
+    authenticateUser(tgUser, startParam, userId);
   }, []);
 
-  const authenticateUser = async (tgUser, referralCode) => {
+  const authenticateUser = async (tgUser, startParam, fallbackId) => {
     try {
-      const name = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ') || 'Survey User';
+      const tgUserId = tgUser?.id ? String(tgUser.id) : fallbackId;
+      const referralCode = startParam || new URLSearchParams(window.location.search).get('ref') || null;
+
       const payload = {
-        telegramUserId: String(tgUser.id),
-        name,
-        username: tgUser.username || 'user',
+        telegramUserId: tgUserId,
+        name: tgUser ? `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim() : 'User',
+        username: tgUser?.username || 'user',
         referralCode
       };
 
@@ -109,9 +119,9 @@ export default function App() {
         if (sData.cpxOfferwallUrl) setCpxOfferwallUrl(sData.cpxOfferwallUrl);
       }
 
-      // 1b. Fetch Opinion Universe survey feed
+      // 1b. Fetch Opinion Universe survey feed with user ID so already-clicked surveys are filtered out
       try {
-        const ouRes = await fetch('/api/surveys');
+        const ouRes = await fetch(`/api/surveys?telegramUserId=${encodeURIComponent(tgUserId)}`);
         const ouData = await ouRes.json();
         if (ouData.success) setOuSurveys(ouData.surveys || []);
       } catch (_) {}
@@ -147,6 +157,18 @@ export default function App() {
   // Start Survey Handler
   const handleStartSurvey = async (survey) => {
     try {
+      const rawId = survey.id || String(survey.surveyId || '').replace('ou_', '');
+      const sKey = String(rawId || survey.surveyId || survey.title);
+
+      // Record click timestamp so frontend handles 60s live countdown and permanent exclusion
+      setClickedSurveys(prev => {
+        const updated = { ...prev, [sKey]: Date.now() };
+        if (survey.surveyId) updated[String(survey.surveyId)] = Date.now();
+        if (survey.id) updated[String(survey.id)] = Date.now();
+        try { localStorage.setItem('sk_clicked_surveys', JSON.stringify(updated)); } catch (_) {}
+        return updated;
+      });
+
       // Opinion Universe surveys: route through backend for click tracking & redirect
       const isOu = survey._type === 'ou' ||
         survey.provider === 'opinion_universe' ||
@@ -155,7 +177,6 @@ export default function App() {
         String(survey.surveyId || '').startsWith('ou_');
 
       if (isOu) {
-        const rawId = survey.id || String(survey.surveyId || '').replace('ou_', '');
         const tgId = user?.telegramUserId || (window.Telegram?.WebApp?.initDataUnsafe?.user?.id ? String(window.Telegram.WebApp.initDataUnsafe.user.id) : '1981634693');
         const startUrl = `/api/surveys/${rawId}/start?telegramUserId=${encodeURIComponent(tgId)}`;
         window.open(startUrl, '_blank');
@@ -262,9 +283,9 @@ export default function App() {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '12px',
+                width: '34px',
+                height: '34px',
+                borderRadius: '10px',
                 background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                 display: 'flex',
                 alignItems: 'center',
@@ -284,6 +305,7 @@ export default function App() {
             <HomeTab
               user={user}
               surveys={surveys}
+              clickedSurveys={clickedSurveys}
               onStartSurvey={handleStartSurvey}
               onNavigate={(tab) => setActiveTab(tab)}
             />
@@ -293,6 +315,7 @@ export default function App() {
             <SurveysTab
               surveys={surveys}
               ouSurveys={ouSurveys}
+              clickedSurveys={clickedSurveys}
               onStartSurvey={handleStartSurvey}
             />
           )}

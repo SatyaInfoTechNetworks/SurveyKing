@@ -1,8 +1,13 @@
 import React from 'react';
 import { Sparkles, TrendingUp, ShieldCheck, Play, ArrowRight, Zap, Coins, Clock, Trophy, ChevronRight } from 'lucide-react';
 
-export default function HomeTab({ user, surveys, onStartSurvey, onNavigate }) {
-  const topSurveys = surveys.slice(0, 3);
+export default function HomeTab({ user, surveys, clickedSurveys = {}, onStartSurvey, onNavigate }) {
+  const availableSurveys = (surveys || []).filter(s => {
+    const rawId = String(s.id || s.surveyId || '').replace('ou_', '');
+    const clickTime = clickedSurveys[rawId] || clickedSurveys[String(s.surveyId)] || clickedSurveys[String(s.id)];
+    return !clickTime || (Date.now() - clickTime) < 60000;
+  });
+  const topSurveys = availableSurveys.slice(0, 3);
   const coins = user?.balance ?? 0;
   const rupees = (coins / 100).toFixed(2);
 
@@ -173,14 +178,34 @@ export default function HomeTab({ user, surveys, onStartSurvey, onNavigate }) {
               <span className="meta-item" style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent-green)' }}>≈ ₹{(survey.reward / 100).toFixed(0)} INR</span>
             </div>
 
-            <button 
-              className="btn-primary" 
-              style={{ width: 'auto', padding: '8px 16px', fontSize: '0.8rem', flexShrink: 0 }}
-              onClick={() => onStartSurvey(survey)}
-            >
-              <Play size={13} fill="#000" />
-              <span>Start Survey</span>
-            </button>
+            {(() => {
+              const rawId = String(survey.id || survey.surveyId || '').replace('ou_', '');
+              const clickTime = clickedSurveys[rawId] || clickedSurveys[String(survey.surveyId)] || clickedSurveys[String(survey.id)];
+              const isRecentlyClicked = Boolean(clickTime && (Date.now() - clickTime) < 60000);
+              const remaining = isRecentlyClicked ? Math.max(1, 60 - Math.floor((Date.now() - clickTime) / 1000)) : 0;
+
+              return isRecentlyClicked ? (
+                <button
+                  disabled
+                  style={{
+                    width: 'auto', padding: '8px 14px', fontSize: '0.76rem', flexShrink: 0,
+                    background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
+                    color: '#94a3b8', borderRadius: '8px', cursor: 'default', fontWeight: 700
+                  }}
+                >
+                  Started ({remaining}s)
+                </button>
+              ) : (
+                <button 
+                  className="btn-primary" 
+                  style={{ width: 'auto', padding: '8px 16px', fontSize: '0.8rem', flexShrink: 0 }}
+                  onClick={() => onStartSurvey(survey)}
+                >
+                  <Play size={13} fill="#000" />
+                  <span>Start Survey</span>
+                </button>
+              );
+            })()}
           </div>
         </div>
       ))}

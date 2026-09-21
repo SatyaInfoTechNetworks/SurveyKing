@@ -365,7 +365,22 @@ async function getSurveys(req, res) {
       isLiveCPX: false
     }));
 
-    const allSurveys = [...liveCpxSurveys, ...liveTimeWallSurveys, ...formattedCustom];
+    let allSurveys = [...liveCpxSurveys, ...liveTimeWallSurveys, ...formattedCustom];
+
+    // Filter out surveys that the user has already clicked / started so they are not shown again
+    if (tgUserId) {
+      try {
+        const uRows = await db.query('SELECT id FROM users WHERE telegram_user_id = ?', [tgUserId]);
+        if (uRows.length > 0) {
+          const uid = uRows[0].id;
+          const partRows = await db.query('SELECT DISTINCT survey_id FROM survey_participations WHERE user_id = ?', [uid]);
+          const attemptedIds = new Set(partRows.map(r => String(r.survey_id)));
+          allSurveys = allSurveys.filter(s => !attemptedIds.has(String(s.id)) && !attemptedIds.has(String(s.surveyId)));
+        }
+      } catch (fErr) {
+        console.warn('Error filtering attempted surveys:', fErr.message);
+      }
+    }
 
     // Sort combined surveys: High conversion rate first, then high reward amount first
     allSurveys.sort((a, b) => {
