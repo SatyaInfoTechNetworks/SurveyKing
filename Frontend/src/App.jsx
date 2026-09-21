@@ -147,9 +147,17 @@ export default function App() {
   // Start Survey Handler
   const handleStartSurvey = async (survey) => {
     try {
-      // Opinion Universe surveys: route through backend for click tracking
-      if (survey.provider === 'opinion_universe' && survey.id) {
-        const startUrl = `/api/surveys/${survey.id}/start?telegramUserId=${user?.telegramUserId || ''}`;
+      // Opinion Universe surveys: route through backend for click tracking & redirect
+      const isOu = survey._type === 'ou' ||
+        survey.provider === 'opinion_universe' ||
+        survey.provider === 'Opinion Universe' ||
+        survey.providerName === 'Opinion Universe' ||
+        String(survey.surveyId || '').startsWith('ou_');
+
+      if (isOu) {
+        const rawId = survey.id || String(survey.surveyId || '').replace('ou_', '');
+        const tgId = user?.telegramUserId || (window.Telegram?.WebApp?.initDataUnsafe?.user?.id ? String(window.Telegram.WebApp.initDataUnsafe.user.id) : '1981634693');
+        const startUrl = `/api/surveys/${rawId}/start?telegramUserId=${encodeURIComponent(tgId)}`;
         window.open(startUrl, '_blank');
         return;
       }

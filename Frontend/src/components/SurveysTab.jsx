@@ -17,6 +17,7 @@ export default function SurveysTab({ surveys, ouSurveys = [], onStartSurvey }) {
   // Normalize OU surveys to a unified shape
   const ouNormalized = (ouSurveys || []).map(s => ({
     ...s,
+    id: s.id,
     surveyId: `ou_${s.id}`,
     title: s.title,
     reward: s.coinsReward,
@@ -24,7 +25,8 @@ export default function SurveysTab({ surveys, ouSurveys = [], onStartSurvey }) {
     estimatedMinutes: s.loi || 0,
     category: 'General',
     icon: '🌐',
-    provider: 'Opinion Universe',
+    provider: 'opinion_universe',
+    providerName: 'Opinion Universe',
     _type: 'ou',
     isFeatured: s.isFeatured || false
   }));
@@ -37,7 +39,8 @@ export default function SurveysTab({ surveys, ouSurveys = [], onStartSurvey }) {
   const providerFilters = ['ALL', 'CPX Research', 'Opinion Universe'];
 
   const filtered = allSurveys.filter(s => {
-    const matchProvider = filterProvider === 'ALL' || s.provider === filterProvider;
+    const pName = s.providerName || (s.provider === 'opinion_universe' ? 'Opinion Universe' : s.provider);
+    const matchProvider = filterProvider === 'ALL' || pName === filterProvider;
     const matchCategory = filterCategory === 'ALL' || s.category?.toLowerCase() === filterCategory.toLowerCase();
     return matchProvider && matchCategory;
   });
@@ -140,7 +143,7 @@ export default function SurveysTab({ surveys, ouSurveys = [], onStartSurvey }) {
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     {s._type === 'ou' ? (
                       <span style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', padding: '1px 6px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700 }}>
-                        🌐 {s.provider}
+                        🌐 {s.providerName || 'Opinion Universe'}
                       </span>
                     ) : (
                       <span style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', padding: '1px 6px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700 }}>

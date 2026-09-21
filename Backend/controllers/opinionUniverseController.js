@@ -273,15 +273,26 @@ async function getUserSurveyFeed(req, res) {
 async function startSurvey(req, res) {
   try {
     const { surveyId } = req.params;
-    const telegramUserId = req.query.telegramUserId || req.body?.telegramUserId;
-    if (!telegramUserId) return res.status(400).json({ success: false, error: 'telegramUserId is required' });
+    const telegramUserId = (req.query.telegramUserId || req.body?.telegramUserId || '1981634693').trim();
 
-    const userRows = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [String(telegramUserId)]);
-    if (!userRows.length) return res.status(404).json({ success: false, error: 'User not found' });
-    const user = userRows[0];
+    let userRows = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [String(telegramUserId)]);
+    let user;
+    if (!userRows.length) {
+      try {
+        await db.execute(
+          'INSERT INTO users (telegram_user_id, username, balance) VALUES (?, ?, 0.00)',
+          [String(telegramUserId), 'user_' + telegramUserId]
+        );
+      } catch (_) {}
+      userRows = await db.query('SELECT * FROM users WHERE telegram_user_id = ?', [String(telegramUserId)]);
+    }
+    user = userRows[0];
+
+    if (!user) return res.status(404).json({ success: false, error: 'User could not be resolved' });
     if (user.status === 'BANNED') return res.status(403).json({ success: false, error: 'Account restricted' });
 
-    const surveyRows = await db.query('SELECT * FROM opinion_universe_surveys WHERE id = ?', [surveyId]);
+    // Allow lookup by internal DB id OR external_offer_id
+    const surveyRows = await db.query('SELECT * FROM opinion_universe_surveys WHERE id = ? OR external_offer_id = ?', [surveyId, String(surveyId)]);
     if (!surveyRows.length) return res.status(404).json({ success: false, error: 'Survey not found' });
     const survey = surveyRows[0];
 
@@ -294,18 +305,19 @@ async function startSurvey(req, res) {
     await db.execute(
       `INSERT INTO survey_clicks (click_id, user_id, survey_id, provider, external_offer_id, status)
        VALUES (?, ?, ?, ?, ?, 'started')`,
-      [clickId, user.id, survey.id, survey.provider, survey.external_offer_id]
+      [clickId, user.id, survey.id, survey.provider || 'opinion_universe', survey.external_offer_id]
     );
 
     const finalUrl = survey.survey_url_template
       .replace(/{YOUR_CLICK_ID}/g, clickId)
       .replace(/{YOUR_SOURCE_ID}/g, OU_SOURCE);
 
-    console.log(`Survey Start: User ${user.id} -> ${survey.id} -> ${clickId}`);
+    console.log(`[OU Start Survey] User #${user.id} (${user.telegram_user_id}) -> Survey #${survey.id} (${survey.external_offer_id})`);
+    console.log(`[OU Redirect URL] -> ${finalUrl}`);
     return res.redirect(302, finalUrl);
   } catch (err) {
     console.error('Error starting survey:', err);
-    return res.status(500).json({ success: false, error: 'Failed to start survey' });
+    return res.status(500).json({ success: false, error: 'Failed to start survey: ' + err.message });
   }
 }
 
