@@ -163,6 +163,39 @@ export default function SurveysTab({ surveys, ouSurveys = [], onStartSurvey }) {
               </div>
             </div>
 
+            {/* Survey Description / About */}
+            {s.description && (
+              <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '8px', lineHeight: 1.4 }}>
+                {s.description}
+              </div>
+            )}
+
+            {/* How to Qualify Tips Box */}
+            {s.qualificationTips && (
+              <div style={{
+                marginTop: '10px',
+                background: 'rgba(99, 102, 241, 0.08)',
+                border: '1px solid rgba(99, 102, 241, 0.25)',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                fontSize: '0.76rem',
+                color: '#c7d2fe',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px'
+              }}>
+                <span style={{ fontSize: '1rem', flexShrink: 0 }}>💡</span>
+                <div style={{ minWidth: 0 }}>
+                  <strong style={{ color: '#a5b4fc', display: 'block', marginBottom: '2px', fontSize: '0.76rem' }}>
+                    How to Qualify:
+                  </strong>
+                  <div style={{ whiteSpace: 'pre-line', fontSize: '0.74rem', color: '#e0e7ff', lineHeight: 1.4 }}>
+                    {s.qualificationTips}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '10px', marginTop: '12px' }}>
               <div className="survey-meta" style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
                 <span className="meta-item" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

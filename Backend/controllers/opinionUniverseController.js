@@ -201,10 +201,25 @@ async function updateSurveyCoins(req, res) {
   }
 }
 
+async function updateSurveyExtraInfo(req, res) {
+  try {
+    const { id } = req.params;
+    const { description, qualificationTips, extraInfo } = req.body;
+    await db.execute(
+      'UPDATE opinion_universe_surveys SET description = ?, qualification_tips = ?, extra_info = ? WHERE id = ?',
+      [description || null, qualificationTips || null, extraInfo || null, id]
+    );
+    return res.json({ success: true, message: 'Extra info and qualification tips updated successfully!' });
+  } catch (err) {
+    console.error('Error updating extra info:', err);
+    return res.status(500).json({ success: false, error: 'Failed to update extra info: ' + err.message });
+  }
+}
+
 async function getUserSurveyFeed(req, res) {
   try {
     const rows = await db.query(
-      `SELECT id, provider, external_offer_id, title, description, image_url, payout, loi, ir, countries, devices, is_featured, coins_reward
+      `SELECT id, provider, external_offer_id, title, description, image_url, payout, loi, ir, countries, devices, is_featured, coins_reward, qualification_tips, extra_info
        FROM opinion_universe_surveys WHERE status = 'active'
        ORDER BY is_featured DESC, coins_reward DESC, created_at DESC`
     );
@@ -215,7 +230,8 @@ async function getUserSurveyFeed(req, res) {
         title: s.title, description: s.description, imageUrl: s.image_url,
         payout: parseFloat(s.payout), loi: s.loi, ir: s.ir,
         countries: s.countries, devices: s.devices,
-        isFeatured: s.is_featured === 1, coinsReward: s.coins_reward
+        isFeatured: s.is_featured === 1, coinsReward: s.coins_reward,
+        qualificationTips: s.qualification_tips, extraInfo: s.extra_info
       }))
     });
   } catch (err) {
@@ -444,7 +460,7 @@ async function getAdminConversions(req, res) {
 
 module.exports = {
   fetchLiveOffers, getAdminSurveys, addSurvey, updateSurveyStatus,
-  featureSurvey, deleteSurvey, updateSurveyCoins, getUserSurveyFeed,
+  featureSurvey, deleteSurvey, updateSurveyCoins, updateSurveyExtraInfo, getUserSurveyFeed,
   startSurvey, handlePostback, getAdminSurveyClicks, getAdminConversions
 };
 

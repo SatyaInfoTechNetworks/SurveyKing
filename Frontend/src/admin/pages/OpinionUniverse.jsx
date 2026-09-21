@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Search, Plus, ToggleLeft, ToggleRight, Star, Trash2, ExternalLink, RefreshCw, Zap, Clock, Coins, TrendingUp, CheckCircle, XCircle, MousePointerClick, Copy } from 'lucide-react';
+import { Globe, Search, Plus, ToggleLeft, ToggleRight, Star, Trash2, ExternalLink, RefreshCw, Zap, Clock, Coins, TrendingUp, CheckCircle, XCircle, MousePointerClick, Copy, FileText } from 'lucide-react';
 
 const cardStyle = {
   background: 'rgba(255,255,255,0.03)',
@@ -74,6 +74,93 @@ function CoinsInput({ surveyId, currentCoins, onSave }) {
   );
 }
 
+function SurveyExtraInfoEditor({ survey, onSave, onCancel }) {
+  const [description, setDescription] = useState(survey.description || '');
+  const [qualificationTips, setQualificationTips] = useState(survey.qualification_tips || '');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/opinion-universe/surveys/${survey.id}/extra-info`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description, qualificationTips })
+      });
+      const data = await res.json();
+      if (data.success) {
+        onSave(data.message);
+      } else {
+        alert(data.error || 'Failed to save');
+      }
+    } catch (e) {
+      alert('Error saving: ' + e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{
+      width: '100%',
+      marginTop: '12px',
+      padding: '14px 16px',
+      background: 'rgba(0,0,0,0.35)',
+      border: '1px solid rgba(99,102,241,0.35)',
+      borderRadius: '10px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '12px'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#a5b4fc', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span>💡</span> Extra Info & How to Qualify Guide
+        </div>
+        <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+          This guidance will be shown directly to users on the survey card.
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
+        <div>
+          <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, marginBottom: '4px' }}>
+            ABOUT THIS SURVEY (Description / Topic)
+          </div>
+          <textarea
+            rows={3}
+            placeholder="e.g. Consumer lifestyle survey about online shopping habits..."
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            style={{ ...inputStyle, resize: 'vertical', width: '100%', cursor: 'text' }}
+          />
+        </div>
+
+        <div>
+          <div style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 700, marginBottom: '4px' }}>
+            🎯 HOW TO QUALIFY WELL (Tips & Requirements)
+          </div>
+          <textarea
+            rows={3}
+            placeholder="e.g. • Must be 25-45 years old&#10;• Answer attentively without rushing&#10;• Select primary household decision maker"
+            value={qualificationTips}
+            onChange={e => setQualificationTips(e.target.value)}
+            style={{ ...inputStyle, resize: 'vertical', width: '100%', borderColor: 'rgba(16,185,129,0.35)', cursor: 'text' }}
+          />
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+        <button onClick={onCancel} style={{ ...btnSecondary, padding: '7px 14px' }}>
+          Cancel
+        </button>
+        <button onClick={handleSave} disabled={saving} style={{ ...btnPrimary, padding: '7px 16px' }}>
+          {saving ? 'Saving...' : '💾 Save Qualify Tips'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function OpinionUniversePage({ onNotify }) {
   const [activeSubTab, setActiveSubTab] = useState('fetch');
   const [fetchLoading, setFetchLoading] = useState(false);
@@ -83,6 +170,7 @@ export default function OpinionUniversePage({ onNotify }) {
   const [managedSurveys, setManagedSurveys] = useState([]);
   const [clicks, setClicks] = useState([]);
   const [conversions, setConversions] = useState([]);
+  const [editingTipsSurveyId, setEditingTipsSurveyId] = useState(null);
   const [addingId, setAddingId] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
   // API Filters
@@ -497,6 +585,23 @@ export default function OpinionUniversePage({ onNotify }) {
                   {/* Actions */}
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <button
+                      onClick={() => setEditingTipsSurveyId(editingTipsSurveyId === s.id ? null : s.id)}
+                      title="Add or Edit Extra Info & How to Qualify Guide"
+                      style={{
+                        ...btnSecondary,
+                        padding: '7px 12px',
+                        background: s.qualification_tips ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.06)',
+                        borderColor: s.qualification_tips ? '#6366f1' : 'rgba(255,255,255,0.12)',
+                        color: s.qualification_tips ? '#a5b4fc' : '#fff'
+                      }}
+                    >
+                      <FileText size={14} />
+                      <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>
+                        {s.qualification_tips ? 'Edit Qualify Tips' : '+ Add Qualify Tips'}
+                      </span>
+                    </button>
+
+                    <button
                       onClick={() => handleToggleFeature(s)}
                       title={s.is_featured ? 'Unfeature' : 'Feature'}
                       style={{ ...btnSecondary, padding: '7px 10px', color: s.is_featured ? '#f59e0b' : undefined }}
@@ -517,6 +622,41 @@ export default function OpinionUniversePage({ onNotify }) {
                       <Trash2 size={14} />
                     </button>
                   </div>
+
+                  {/* Qualification Tips Preview (if set and not editing) */}
+                  {s.qualification_tips && editingTipsSurveyId !== s.id && (
+                    <div style={{
+                      width: '100%',
+                      background: 'rgba(99,102,241,0.08)',
+                      border: '1px solid rgba(99,102,241,0.2)',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      fontSize: '0.76rem',
+                      color: '#c7d2fe',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '8px'
+                    }}>
+                      <span style={{ fontSize: '0.9rem' }}>💡</span>
+                      <div>
+                        <strong style={{ color: '#a5b4fc', display: 'block', marginBottom: '2px' }}>How to Qualify Tips:</strong>
+                        <span style={{ color: '#e0e7ff', whiteSpace: 'pre-line' }}>{s.qualification_tips}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Inline Editor for Extra Info & Qualify Tips */}
+                  {editingTipsSurveyId === s.id && (
+                    <SurveyExtraInfoEditor
+                      survey={s}
+                      onSave={(msg) => {
+                        onNotify(msg);
+                        setEditingTipsSurveyId(null);
+                        loadManagedSurveys();
+                      }}
+                      onCancel={() => setEditingTipsSurveyId(null)}
+                    />
+                  )}
                 </div>
               ))}
             </div>
