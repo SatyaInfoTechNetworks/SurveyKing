@@ -15,41 +15,62 @@ function generateClickId(userId, externalOfferId) {
   return `SK_${userId}_${externalOfferId}_${rand}_${Date.now()}`;
 }
 
-function httpGet(url) {
+function httpGet(url, timeoutMs = 12000) {
   return new Promise((resolve, reject) => {
     const client = url.startsWith('https') ? https : http;
-    client.get(url, (res) => {
+    const req = client.get(url, (res) => {
       let data = '';
       res.on('data', chunk => (data += chunk));
       res.on('end', () => {
         try { resolve(JSON.parse(data)); }
         catch (e) { reject(new Error('Invalid JSON from Opinion Universe API')); }
       });
-    }).on('error', reject);
+    });
+    req.on('error', reject);
+    // Abort if no response within timeoutMs
+    req.setTimeout(timeoutMs, () => {
+      req.destroy();
+      reject(new Error(`Opinion Universe API timed out after ${timeoutMs / 1000}s`));
+    });
   });
 }
 
 async function fetchLiveOffers(req, res) {
   try {
-    const url = `https://api.opinionuniverse.com/publisher/offersFeed?key=${OU_API_KEY}&pubid=${OU_PUB_ID}&app_id=${OU_APP_ID}&type=live_surveys`;
+    // Accept filter params from admin UI
+    const country   = req.query.country   || 'All';
+    const platform  = req.query.platform  || 'All';
+    const type      = req.query.type      || 'live_surveys';
+    const payoutType = req.query.payoutType || 'All';
+
+    // Build URL with filters forwarded to OU API
+    const params = new URLSearchParams({
+      key:       OU_API_KEY,
+      pubid:     OU_PUB_ID,
+      app_id:    OU_APP_ID,
+      type,
+      ...(country  !== 'All' && { country }),
+      ...(platform !== 'All' && { platform }),
+      ...(payoutType !== 'All' && { payoutType })
+    });
+    const url = `https://api.opinionuniverse.com/publisher/offersFeed?${params.toString()}`;
+
     console.log('============================================');
     console.log('OU API REQUEST URL:', url);
-    console.log('OU_PUB_ID:', OU_PUB_ID, '| OU_APP_ID:', OU_APP_ID);
+    console.log('Filters → country:', country, '| platform:', platform, '| type:', type, '| payoutType:', payoutType);
     console.log('============================================');
 
-    const data = await httpGet(url);
+    const data = await httpGet(url, 15000);
 
-    // Log full raw response so we can see exactly what OU returns
+    // Log full raw response
     console.log('OU API RAW RESPONSE:');
     console.log(JSON.stringify(data, null, 2));
     console.log('============================================');
 
-    // Lenient success check: accept numeric 200 OR string "200", accept any truthy message
     const isSuccess =
       (data.code === 200 || data.code === '200' || data.status === 200 || data.status === 'success') &&
       (data.message === 'success' || data.status === 'success' || data.success === true);
 
-    // If still not success, check if offers exist anyway (some providers skip the status field)
     const offersRaw =
       data?.data?.response?.offers ||
       data?.data?.offers ||
@@ -66,22 +87,22 @@ async function fetchLiveOffers(req, res) {
       });
     }
 
-    const offers = offersRaw;
-    console.log(`OU API: Found ${offers.length} offers.`);
-
+    console.log(`OU API: Found ${offersRaw.length} offers.`);
     return res.json({
-      success: true, count: offers.length,
+      success: true,
+      count: offersRaw.length,
       currencyName: data?.data?.response?.currency_name || data?.data?.currency_name || 'Points',
-      offers: offers.map(o => ({
+      filtersApplied: { country, platform, type, payoutType },
+      offers: offersRaw.map(o => ({
         offerId: o.offer_id, offerName: o.offer_name, offerDesc: o.offer_desc || null,
         callToAction: o.call_to_action || null, offerUrlTemplate: o.offer_url_easy || o.offer_url || '',
         payout: parseFloat(o.payout || o.amount || 0), offerType: o.offer_type || 'Consumer',
         imageUrl: o.image_url || null, loi: o.loi || 0, ir: o.ir || 0,
-        countries: o.countries || 'All', devices: o.devices || 'All'
+        countries: o.countries || country, devices: o.devices || platform
       }))
     });
   } catch (err) {
-    console.error('Error fetching OU offers:', err.message, err.stack);
+    console.error('Error fetching OU offers:', err.message);
     return res.status(500).json({ success: false, error: 'Failed to fetch offers: ' + err.message });
   }
 }

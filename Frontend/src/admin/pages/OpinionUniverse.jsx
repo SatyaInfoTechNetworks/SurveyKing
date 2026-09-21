@@ -16,7 +16,9 @@ const inputStyle = {
   color: '#fff',
   fontSize: '0.85rem',
   width: '100%',
-  outline: 'none'
+  outline: 'none',
+  fontFamily: 'inherit',
+  cursor: 'pointer'
 };
 
 const btnPrimary = {
@@ -83,6 +85,14 @@ export default function OpinionUniversePage({ onNotify }) {
   const [conversions, setConversions] = useState([]);
   const [addingId, setAddingId] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
+  // API Filters
+  const [filterCountry, setFilterCountry] = useState('All');
+  const [filterPlatform, setFilterPlatform] = useState('All');
+  const [filterType, setFilterType] = useState('live_surveys');
+  const [filterPayoutType, setFilterPayoutType] = useState('All');
+  const [filterMinPayout, setFilterMinPayout] = useState('');
+  const [filterMaxLoi, setFilterMaxLoi] = useState('');
+  const [filterMinIr, setFilterMinIr] = useState('');
 
   useEffect(() => {
     if (activeSubTab === 'managed') loadManagedSurveys();
@@ -118,7 +128,14 @@ export default function OpinionUniversePage({ onNotify }) {
     setFetchLoading(true);
     setFetchError(null);
     try {
-      const res = await fetch('/api/admin/opinion-universe/fetch');
+      const params = new URLSearchParams();
+      if (filterCountry !== 'All') params.set('country', filterCountry);
+      if (filterPlatform !== 'All') params.set('platform', filterPlatform);
+      params.set('type', filterType);
+      if (filterPayoutType !== 'All') params.set('payoutType', filterPayoutType);
+
+      const qs = params.toString();
+      const res = await fetch(`/api/admin/opinion-universe/fetch${qs ? '?' + qs : ''}`);
       const data = await res.json();
       console.log('[OU] Fetch response:', data);
       if (data.success) {
@@ -197,9 +214,12 @@ export default function OpinionUniversePage({ onNotify }) {
   };
 
   const filteredOffers = liveOffers.filter(o => {
-    if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
-    return String(o.offerId).includes(term) || o.offerName?.toLowerCase().includes(term);
+    const matchSearch = !searchTerm || String(o.offerId).includes(term) || o.offerName?.toLowerCase().includes(term);
+    const matchPayout = !filterMinPayout || parseFloat(o.payout) >= parseFloat(filterMinPayout);
+    const matchLoi    = !filterMaxLoi    || parseInt(o.loi)     <= parseInt(filterMaxLoi);
+    const matchIr     = !filterMinIr     || parseInt(o.ir)      >= parseInt(filterMinIr);
+    return matchSearch && matchPayout && matchLoi && matchIr;
   });
 
   const subTabs = [
@@ -240,20 +260,100 @@ export default function OpinionUniversePage({ onNotify }) {
       {/* ---- SUB-TAB: FETCH & ADD ---- */}
       {activeSubTab === 'fetch' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Fetch Bar */}
-          <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
-              <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-              <input
-                type="text" placeholder="Search by Offer ID or Survey Name..."
-                value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                style={{ ...inputStyle, paddingLeft: '34px' }}
-              />
+
+          {/* Filter Panel */}
+          <div style={{ ...cardStyle }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '14px' }}>🎛️ API Filters — Sent directly to Opinion Universe</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginBottom: '14px' }}>
+
+              {/* Country */}
+              <div>
+                <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, marginBottom: '5px' }}>COUNTRY</div>
+                <select value={filterCountry} onChange={e => setFilterCountry(e.target.value)}
+                  style={{ ...inputStyle, padding: '8px 12px' }}>
+                  {['All','US','IN','GB','CA','AU','DE','FR','BR','TH','MX','NG','PH','ID','PK'].map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Platform */}
+              <div>
+                <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, marginBottom: '5px' }}>PLATFORM</div>
+                <select value={filterPlatform} onChange={e => setFilterPlatform(e.target.value)}
+                  style={{ ...inputStyle, padding: '8px 12px' }}>
+                  {['All','iPhone','Android'].map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Type */}
+              <div>
+                <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, marginBottom: '5px' }}>TYPE</div>
+                <select value={filterType} onChange={e => setFilterType(e.target.value)}
+                  style={{ ...inputStyle, padding: '8px 12px' }}>
+                  <option value="live_surveys">Live Surveys</option>
+                  <option value="All">All Offers</option>
+                </select>
+              </div>
+
+              {/* Payout Type */}
+              <div>
+                <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, marginBottom: '5px' }}>PAYOUT TYPE</div>
+                <select value={filterPayoutType} onChange={e => setFilterPayoutType(e.target.value)}
+                  style={{ ...inputStyle, padding: '8px 12px' }}>
+                  {['All','percentage','flat'].map(p => (
+                    <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Min Payout (client-side) */}
+              <div>
+                <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, marginBottom: '5px' }}>MIN PAYOUT ($)</div>
+                <input type="number" min="0" step="0.001" placeholder="e.g. 0.5"
+                  value={filterMinPayout} onChange={e => setFilterMinPayout(e.target.value)}
+                  style={{ ...inputStyle, padding: '8px 12px' }} />
+              </div>
+
+              {/* Max LOI (client-side) */}
+              <div>
+                <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, marginBottom: '5px' }}>MAX LOI (mins)</div>
+                <input type="number" min="0" placeholder="e.g. 15"
+                  value={filterMaxLoi} onChange={e => setFilterMaxLoi(e.target.value)}
+                  style={{ ...inputStyle, padding: '8px 12px' }} />
+              </div>
+
+              {/* Min IR (client-side) */}
+              <div>
+                <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700, marginBottom: '5px' }}>MIN IR (%)</div>
+                <input type="number" min="0" max="100" placeholder="e.g. 30"
+                  value={filterMinIr} onChange={e => setFilterMinIr(e.target.value)}
+                  style={{ ...inputStyle, padding: '8px 12px' }} />
+              </div>
+
             </div>
-            <button onClick={handleFetch} disabled={fetchLoading} style={btnPrimary}>
-              <RefreshCw size={15} style={{ animation: fetchLoading ? 'spin 1s linear infinite' : 'none' }} />
-              {fetchLoading ? 'Fetching...' : 'Fetch Live Surveys'}
-            </button>
+
+            {/* Search + Fetch Row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
+                <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                <input
+                  type="text" placeholder="Search by Offer ID or Survey Name..."
+                  value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                  style={{ ...inputStyle, paddingLeft: '34px' }}
+                />
+              </div>
+              <button onClick={() => { setFilterCountry('All'); setFilterPlatform('All'); setFilterType('live_surveys'); setFilterPayoutType('All'); setFilterMinPayout(''); setFilterMaxLoi(''); setFilterMinIr(''); setSearchTerm(''); }}
+                style={{ ...btnSecondary, whiteSpace: 'nowrap' }}>
+                ✕ Reset
+              </button>
+              <button onClick={handleFetch} disabled={fetchLoading} style={{ ...btnPrimary, whiteSpace: 'nowrap' }}>
+                <RefreshCw size={15} style={{ animation: fetchLoading ? 'spin 1s linear infinite' : 'none' }} />
+                {fetchLoading ? 'Fetching...' : 'Fetch Live Surveys'}
+              </button>
+            </div>
           </div>
 
           {fetchError && (
