@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Search, Plus, ToggleLeft, ToggleRight, Star, Trash2, ExternalLink, RefreshCw, Zap, Clock, Coins, TrendingUp, CheckCircle, XCircle, MousePointerClick } from 'lucide-react';
+import { Globe, Search, Plus, ToggleLeft, ToggleRight, Star, Trash2, ExternalLink, RefreshCw, Zap, Clock, Coins, TrendingUp, CheckCircle, XCircle, MousePointerClick, Copy } from 'lucide-react';
 
 const cardStyle = {
   background: 'rgba(255,255,255,0.03)',
@@ -93,6 +93,16 @@ export default function OpinionUniversePage({ onNotify }) {
   const [filterMinAmount, setFilterMinAmount] = useState('');
   const [filterMaxLoi, setFilterMaxLoi] = useState('');
   const [filterMinIr, setFilterMinIr] = useState('');
+  // History Tracker states
+  const [historyFilterStatus, setHistoryFilterStatus] = useState('ALL');
+  const [historySearch, setHistorySearch] = useState('');
+  const [copiedClickId, setCopiedClickId] = useState(null);
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    setCopiedClickId(text);
+    setTimeout(() => setCopiedClickId(null), 2000);
+  };
 
   useEffect(() => {
     if (activeSubTab === 'managed') loadManagedSurveys();
@@ -223,11 +233,25 @@ export default function OpinionUniversePage({ onNotify }) {
     return matchSearch && matchAmount && matchLoi && matchIr;
   });
 
+  const filteredClicks = clicks.filter(c => {
+    const statusMatch = historyFilterStatus === 'ALL' || c.display_status === historyFilterStatus;
+    const term = historySearch.toLowerCase();
+    const searchMatch = !historySearch ||
+      String(c.user_id).includes(term) ||
+      c.user_name?.toLowerCase().includes(term) ||
+      c.telegram_user_id?.toLowerCase().includes(term) ||
+      c.click_id?.toLowerCase().includes(term) ||
+      c.survey_title?.toLowerCase().includes(term) ||
+      String(c.external_offer_id).includes(term) ||
+      c.conversion_id?.toLowerCase().includes(term);
+    return statusMatch && searchMatch;
+  });
+
   const subTabs = [
     { id: 'fetch', label: '🔍 Fetch & Add Surveys' },
     { id: 'managed', label: `📋 Managed Surveys (${managedSurveys.length})` },
-    { id: 'clicks', label: `🖱️ Click Tracker (${clicks.length})` },
-    { id: 'conversions', label: `💰 Conversions (${conversions.length})` }
+    { id: 'clicks', label: `📊 Offer History & Transactions (${clicks.length})` },
+    { id: 'conversions', label: `💰 Conversions Log (${conversions.length})` }
   ];
 
   return (
@@ -500,40 +524,207 @@ export default function OpinionUniversePage({ onNotify }) {
         </div>
       )}
 
-      {/* ---- SUB-TAB: CLICK TRACKER ---- */}
+      {/* ---- SUB-TAB: OFFER HISTORY & TRANSACTIONS ---- */}
       {activeSubTab === 'clicks' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
-            <button onClick={loadClicks} style={btnSecondary}><RefreshCw size={14} /> Refresh</button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Top Summary Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+            <div style={{ ...cardStyle, padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'rgba(99,102,241,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <MousePointerClick size={20} color="#a5b4fc" />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>TOTAL CLICKS</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff' }}>{clicks.length}</div>
+              </div>
+            </div>
+
+            <div style={{ ...cardStyle, padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CheckCircle size={20} color="#10b981" />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>CREDITED (PAYOUT)</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10b981' }}>
+                  {clicks.filter(c => c.display_status === 'CREDITED').length}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ ...cardStyle, padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Clock size={20} color="#f59e0b" />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>CLICKED (PENDING)</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f59e0b' }}>
+                  {clicks.filter(c => c.display_status === 'CLICKED').length}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ ...cardStyle, padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'rgba(234,179,8,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Coins size={20} color="#eab308" />
+              </div>
+              <div>
+                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>TOTAL COINS PAID</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#eab308' }}>
+                  {clicks.reduce((acc, c) => acc + (c.display_status === 'CREDITED' ? (Number(c.user_reward_coins) || 0) : 0), 0).toLocaleString()} 🪙
+                </div>
+              </div>
+            </div>
           </div>
+
+          {/* Filter & Search Bar */}
+          <div style={{ ...cardStyle, padding: '14px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {[
+                { id: 'ALL', label: `All (${clicks.length})` },
+                { id: 'CREDITED', label: `✅ Credited (${clicks.filter(c => c.display_status === 'CREDITED').length})` },
+                { id: 'CLICKED', label: `⏳ Clicked (${clicks.filter(c => c.display_status === 'CLICKED').length})` },
+                { id: 'REVERSED', label: `⚠️ Reversed (${clicks.filter(c => c.display_status === 'REVERSED').length})` }
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setHistoryFilterStatus(f.id)}
+                  style={{
+                    background: historyFilterStatus === f.id ? '#6366f1' : 'rgba(255,255,255,0.06)',
+                    color: historyFilterStatus === f.id ? '#fff' : '#94a3b8',
+                    border: '1px solid ' + (historyFilterStatus === f.id ? '#6366f1' : 'rgba(255,255,255,0.1)'),
+                    borderRadius: '8px', padding: '6px 12px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer'
+                  }}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1, minWidth: '220px', maxWidth: '400px' }}>
+              <div style={{ position: 'relative', width: '100%' }}>
+                <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                <input
+                  type="text"
+                  placeholder="Search User, Click ID, Offer..."
+                  value={historySearch}
+                  onChange={e => setHistorySearch(e.target.value)}
+                  style={{ ...inputStyle, paddingLeft: '32px', padding: '8px 12px 8px 32px', fontSize: '0.8rem' }}
+                />
+              </div>
+              <button onClick={loadClicks} style={{ ...btnSecondary, padding: '8px 12px' }} title="Refresh">
+                <RefreshCw size={14} />
+              </button>
+            </div>
+          </div>
+
+          {/* Transactions Table */}
           <div style={{ ...cardStyle, overflow: 'hidden', padding: 0 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                  {['Click ID', 'User', 'Survey', 'Provider', 'Status', 'Started At', 'Completed At'].map(h => (
-                    <th key={h} style={{ padding: '12px 16px', color: '#64748b', fontWeight: 700, textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                  {['User', 'Click ID', 'Offer / Survey', 'Amount (PAYOUT)', 'Status', 'Clicked At', 'Credited At', 'Transaction ID'].map(h => (
+                    <th key={h} style={{ padding: '12px 14px', color: '#64748b', fontWeight: 700, textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {clicks.length === 0 ? (
-                  <tr><td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>No click records yet.</td></tr>
+                {filteredClicks.length === 0 ? (
+                  <tr><td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>No transaction history found.</td></tr>
                 ) : (
-                  clicks.map(c => (
-                    <tr key={c.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                      <td style={{ padding: '12px 16px', color: '#a5b4fc', fontFamily: 'monospace', fontSize: '0.75rem', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.click_id}</td>
-                      <td style={{ padding: '12px 16px', color: '#fff' }}>{c.user_name || c.user_id}<br /><span style={{ color: '#64748b', fontSize: '0.72rem' }}>@{c.telegram_user_id}</span></td>
-                      <td style={{ padding: '12px 16px', color: '#f59e0b', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.survey_title || c.external_offer_id}</td>
-                      <td style={{ padding: '12px 16px' }}><span style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', padding: '2px 8px', borderRadius: '5px', fontSize: '0.72rem', fontWeight: 700 }}>{c.provider}</span></td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{ background: c.status === 'completed' ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.12)', color: c.status === 'completed' ? '#10b981' : '#f59e0b', padding: '3px 8px', borderRadius: '5px', fontSize: '0.72rem', fontWeight: 800 }}>
-                          {c.status?.toUpperCase()}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px', color: '#64748b', fontSize: '0.75rem' }}>{c.created_at ? new Date(c.created_at).toLocaleString() : '-'}</td>
-                      <td style={{ padding: '12px 16px', color: '#64748b', fontSize: '0.75rem' }}>{c.completed_at ? new Date(c.completed_at).toLocaleString() : '-'}</td>
-                    </tr>
-                  ))
+                  filteredClicks.map(c => {
+                    const isCredited = c.display_status === 'CREDITED';
+                    const isReversed = c.display_status === 'REVERSED';
+                    return (
+                      <tr key={c.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        {/* User */}
+                        <td style={{ padding: '12px 14px' }}>
+                          <div style={{ color: '#fff', fontWeight: 700 }}>
+                            #{c.user_id} {c.user_name || 'User'}
+                          </div>
+                          {c.telegram_user_id && (
+                            <div style={{ color: '#64748b', fontSize: '0.72rem' }}>
+                              @{c.telegram_user_id}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Click ID */}
+                        <td style={{ padding: '12px 14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ color: '#a5b4fc', fontFamily: 'monospace', fontSize: '0.74rem', maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {c.click_id}
+                            </span>
+                            <button
+                              onClick={() => copyToClipboard(c.click_id)}
+                              style={{ background: 'none', border: 'none', color: copiedClickId === c.click_id ? '#10b981' : '#64748b', cursor: 'pointer', padding: '2px' }}
+                              title="Copy Click ID"
+                            >
+                              <Copy size={12} />
+                            </button>
+                          </div>
+                        </td>
+
+                        {/* Offer */}
+                        <td style={{ padding: '12px 14px', maxWidth: '170px' }}>
+                          <div style={{ color: '#fff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {c.survey_title}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                            ID: {c.external_offer_id}
+                          </div>
+                        </td>
+
+                        {/* Amount / PAYOUT */}
+                        <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
+                          {isCredited ? (
+                            <span style={{ color: '#10b981', fontWeight: 800, fontSize: '0.9rem' }}>
+                              +{Number(c.user_reward_coins || 0).toLocaleString()} 🪙
+                            </span>
+                          ) : isReversed ? (
+                            <span style={{ color: '#ef4444', fontWeight: 800 }}>
+                              -{Math.abs(Number(c.user_reward_coins || 0)).toLocaleString()} 🪙
+                            </span>
+                          ) : (
+                            <span style={{ color: '#64748b', fontStyle: 'italic' }}>
+                              Pending
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Status */}
+                        <td style={{ padding: '12px 14px' }}>
+                          {isCredited ? (
+                            <span style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)', padding: '3px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 800 }}>
+                              ✅ CREDITED
+                            </span>
+                          ) : isReversed ? (
+                            <span style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)', padding: '3px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 800 }}>
+                              ⚠️ REVERSED
+                            </span>
+                          ) : (
+                            <span style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)', padding: '3px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 800 }}>
+                              ⏳ CLICKED
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Clicked At */}
+                        <td style={{ padding: '12px 14px', color: '#94a3b8', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                          {c.clicked_at ? new Date(c.clicked_at).toLocaleString() : '-'}
+                        </td>
+
+                        {/* Credited At */}
+                        <td style={{ padding: '12px 14px', color: isCredited ? '#10b981' : '#64748b', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                          {c.credited_at ? new Date(c.credited_at).toLocaleString() : (c.completed_at ? new Date(c.completed_at).toLocaleString() : '-')}
+                        </td>
+
+                        {/* Transaction ID */}
+                        <td style={{ padding: '12px 14px', color: '#a5b4fc', fontFamily: 'monospace', fontSize: '0.72rem' }}>
+                          {c.conversion_id || '-'}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

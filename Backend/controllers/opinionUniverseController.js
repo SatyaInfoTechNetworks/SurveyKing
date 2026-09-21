@@ -282,12 +282,6 @@ async function handlePostback(req, res) {
       return res.status(200).send('1');
     }
 
-    // Status: 1 = Completed, 2 = Reversal
-    if (String(status) !== '1') {
-      console.log(`[OU Postback] Non-completion status received (${status}). Acknowledging.`);
-      return res.status(200).send('1');
-    }
-
     // Signature verification (HMAC SHA256 of transactionId with secret token)
     const secret = process.env.OU_POSTBACK_SECRET || '4bb079ad9d6fd601de4183939c1cb201422eef5b2c3e66f00b46b5eaa8ecbafc';
     if (sig && transId && secret) {
@@ -326,13 +320,45 @@ async function handlePostback(req, res) {
     }
     const user = userRows[0];
 
-    // Lookup survey for reward coins
+    // Lookup survey
     const surveyRows = await db.query('SELECT * FROM opinion_universe_surveys WHERE id = ?', [click.survey_id]);
     const survey = surveyRows[0] || null;
-    const rewardCoins = survey?.coins_reward || parseInt(payout, 10) || 0;
+
+    // USE PAYOUT PARAM EXCLUSIVELY FOR USER PAYMENT
+    let rewardCoins = Math.round(parseFloat(payout || 0));
+    if (rewardCoins <= 0 && survey?.coins_reward) {
+      rewardCoins = survey.coins_reward;
+    }
     const providerPayoutVal = parseFloat(pubPayout || survey?.payout || 0);
 
-    // Credit user balance
+    // Handle Reversal (status === '2')
+    if (String(status) === '2') {
+      console.log(`[OU Postback REVERSAL] Reversing conversion for Click ID: ${clickId}`);
+      if (rewardCoins > 0 && user) {
+        const newBalance = Math.max(0, parseFloat(user.balance || 0) - rewardCoins);
+        await db.execute('UPDATE users SET balance = ? WHERE id = ?', [newBalance, user.id]);
+        await db.execute(
+          `INSERT INTO wallet_transactions (user_id, type, amount, reference_id, description)
+           VALUES (?, 'REVERSAL', ?, ?, ?)`,
+          [user.id, -rewardCoins, `OU_REV_${conversionId}`, `Opinion Universe Reversal (-${rewardCoins} Coins)`]
+        );
+      }
+      await db.execute(
+        `INSERT INTO survey_conversions (provider, conversion_id, click_id, user_id, survey_id, provider_payout, user_reward_coins, status, raw_postback)
+         VALUES ('opinion_universe', ?, ?, ?, ?, ?, ?, 'reversal', ?)`,
+        [conversionId, clickId, user.id, click.survey_id, providerPayoutVal, -rewardCoins, raw]
+      );
+      await db.execute('UPDATE survey_clicks SET status = ? WHERE click_id = ?', ['reversed', clickId]);
+      return res.status(200).send('1');
+    }
+
+    // Status must be 1 for completion
+    if (String(status) !== '1') {
+      console.log(`[OU Postback] Non-completion status received (${status}). Acknowledging.`);
+      return res.status(200).send('1');
+    }
+
+    // Credit user balance strictly with rewardCoins from PAYOUT param
     if (rewardCoins > 0) {
       const newBalance = parseFloat(user.balance || 0) + rewardCoins;
       await db.execute('UPDATE users SET balance = ? WHERE id = ?', [newBalance, user.id]);
@@ -353,7 +379,7 @@ async function handlePostback(req, res) {
     // Update click status
     await db.execute('UPDATE survey_clicks SET status = ?, completed_at = NOW() WHERE click_id = ?', ['completed', clickId]);
 
-    console.log(`[OU Postback SUCCESS] Credited +${rewardCoins} coins to User ${user.id} (${user.telegram_user_id}) | Conv: ${conversionId}`);
+    console.log(`[OU Postback SUCCESS] Credited +${rewardCoins} coins (from PAYOUT param) to User ${user.id} (${user.telegram_user_id}) | Conv: ${conversionId}`);
     return res.status(200).send('1');
   } catch (err) {
     console.error('Error handling OU postback:', err);
@@ -364,14 +390,39 @@ async function handlePostback(req, res) {
 async function getAdminSurveyClicks(req, res) {
   try {
     const rows = await db.query(
-      `SELECT sc.*, u.name AS user_name, u.telegram_user_id, ous.title AS survey_title
+      `SELECT 
+         sc.id,
+         sc.click_id,
+         sc.user_id,
+         u.name AS user_name,
+         u.telegram_user_id,
+         sc.external_offer_id,
+         sc.survey_id,
+         COALESCE(ous.title, CONCAT('Offer #', sc.external_offer_id)) AS survey_title,
+         sc.provider,
+         sc.status AS click_status,
+         sc.created_at AS clicked_at,
+         sc.completed_at,
+         scv.conversion_id,
+         scv.user_reward_coins,
+         scv.provider_payout,
+         scv.status AS conversion_status,
+         scv.created_at AS credited_at,
+         CASE 
+           WHEN scv.status = 'credited' THEN 'CREDITED'
+           WHEN scv.status = 'reversal' THEN 'REVERSED'
+           WHEN sc.status = 'completed' THEN 'CREDITED'
+           ELSE 'CLICKED'
+         END AS display_status
        FROM survey_clicks sc
        LEFT JOIN users u ON sc.user_id = u.id
        LEFT JOIN opinion_universe_surveys ous ON sc.survey_id = ous.id
+       LEFT JOIN survey_conversions scv ON sc.click_id = scv.click_id
        ORDER BY sc.created_at DESC LIMIT 500`
     );
     return res.json({ success: true, clicks: rows });
   } catch (err) {
+    console.error('Error fetching survey history:', err);
     return res.status(500).json({ success: false, error: 'Failed to fetch clicks' });
   }
 }
