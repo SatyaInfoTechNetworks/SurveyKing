@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Search, Plus, ToggleLeft, ToggleRight, Star, Trash2, ExternalLink, RefreshCw, Zap, Clock, Coins, TrendingUp, CheckCircle, XCircle, MousePointerClick, Copy, FileText, RotateCcw, Link2 } from 'lucide-react';
+import { Globe, Search, Plus, ToggleLeft, ToggleRight, Star, Trash2, ExternalLink, RefreshCw, Zap, Clock, Coins, TrendingUp, CheckCircle, XCircle, MousePointerClick, Copy, FileText, RotateCcw, Link2, ArrowUpDown } from 'lucide-react';
 
 const cardStyle = {
   background: 'rgba(255,255,255,0.03)',
@@ -184,9 +184,15 @@ export default function OpinionUniversePage({ onNotify }) {
   const [filterMinAmount, setFilterMinAmount] = useState('');
   const [filterMaxLoi, setFilterMaxLoi] = useState('');
   const [filterMinIr, setFilterMinIr] = useState('');
+  const [fetchSortBy, setFetchSortBy] = useState('amount_desc');
+  // Managed Surveys filters & sorting
+  const [managedSearch, setManagedSearch] = useState('');
+  const [managedFilterStatus, setManagedFilterStatus] = useState('ALL');
+  const [managedSortBy, setManagedSortBy] = useState('featured');
   // History Tracker states
   const [historyFilterStatus, setHistoryFilterStatus] = useState('ALL');
   const [historySearch, setHistorySearch] = useState('');
+  const [historySortBy, setHistorySortBy] = useState('date_desc');
   const [copiedClickId, setCopiedClickId] = useState(null);
 
   const copyToClipboard = (text) => {
@@ -360,6 +366,41 @@ export default function OpinionUniversePage({ onNotify }) {
     const matchLoi    = !filterMaxLoi    || parseInt(o.loi)     <= parseInt(filterMaxLoi);
     const matchIr     = !filterMinIr     || parseInt(o.ir)      >= parseInt(filterMinIr);
     return matchSearch && matchAmount && matchLoi && matchIr;
+  }).sort((a, b) => {
+    if (fetchSortBy === 'amount_desc') return (Number(b.amount) || 0) - (Number(a.amount) || 0);
+    if (fetchSortBy === 'amount_asc')  return (Number(a.amount) || 0) - (Number(b.amount) || 0);
+    if (fetchSortBy === 'payout_desc') return (parseFloat(b.payout) || 0) - (parseFloat(a.payout) || 0);
+    if (fetchSortBy === 'loi_asc')     return (parseInt(a.loi) || 0) - (parseInt(b.loi) || 0);
+    if (fetchSortBy === 'loi_desc')    return (parseInt(b.loi) || 0) - (parseInt(a.loi) || 0);
+    if (fetchSortBy === 'ir_desc')     return (parseInt(b.ir) || 0) - (parseInt(a.ir) || 0);
+    if (fetchSortBy === 'name_asc')    return (a.offerName || '').localeCompare(b.offerName || '');
+    return 0;
+  });
+
+  const filteredManagedSurveys = managedSurveys.filter(s => {
+    const term = managedSearch.toLowerCase();
+    const matchSearch = !managedSearch ||
+      String(s.external_offer_id).includes(term) ||
+      (s.title || '').toLowerCase().includes(term) ||
+      (s.countries || '').toLowerCase().includes(term);
+    const matchStatus = managedFilterStatus === 'ALL' ||
+      (managedFilterStatus === 'active' && s.status === 'active') ||
+      (managedFilterStatus === 'inactive' && s.status === 'inactive') ||
+      (managedFilterStatus === 'featured' && s.is_featured === 1);
+    return matchSearch && matchStatus;
+  }).sort((a, b) => {
+    if (managedSortBy === 'featured') {
+      if (b.is_featured !== a.is_featured) return b.is_featured ? 1 : -1;
+      return (b.coins_reward || 0) - (a.coins_reward || 0);
+    }
+    if (managedSortBy === 'coins_desc') return (b.coins_reward || 0) - (a.coins_reward || 0);
+    if (managedSortBy === 'coins_asc')  return (a.coins_reward || 0) - (b.coins_reward || 0);
+    if (managedSortBy === 'loi_asc')     return (parseInt(a.loi) || 0) - (parseInt(b.loi) || 0);
+    if (managedSortBy === 'loi_desc')    return (parseInt(b.loi) || 0) - (parseInt(a.loi) || 0);
+    if (managedSortBy === 'newest')      return (b.id || 0) - (a.id || 0);
+    if (managedSortBy === 'oldest')      return (a.id || 0) - (b.id || 0);
+    if (managedSortBy === 'title')       return (a.title || '').localeCompare(b.title || '');
+    return 0;
   });
 
   const filteredClicks = clicks.filter(c => {
@@ -374,6 +415,12 @@ export default function OpinionUniversePage({ onNotify }) {
       String(c.external_offer_id).includes(term) ||
       c.conversion_id?.toLowerCase().includes(term);
     return statusMatch && searchMatch;
+  }).sort((a, b) => {
+    if (historySortBy === 'date_desc') return new Date(b.clicked_at || 0) - new Date(a.clicked_at || 0);
+    if (historySortBy === 'date_asc')  return new Date(a.clicked_at || 0) - new Date(b.clicked_at || 0);
+    if (historySortBy === 'coins_desc') return (Number(b.user_reward_coins) || 0) - (Number(a.user_reward_coins) || 0);
+    if (historySortBy === 'coins_asc')  return (Number(a.user_reward_coins) || 0) - (Number(b.user_reward_coins) || 0);
+    return 0;
   });
 
   const subTabs = [
@@ -517,8 +564,27 @@ export default function OpinionUniversePage({ onNotify }) {
           )}
 
           {liveOffers.length > 0 && (
-            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted, #64748b)' }}>
-              Showing <strong style={{ color: '#a5b4fc' }}>{filteredOffers.length}</strong> of <strong style={{ color: '#fff' }}>{liveOffers.length}</strong> surveys
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-muted, #64748b)' }}>
+                Showing <strong style={{ color: '#a5b4fc' }}>{filteredOffers.length}</strong> of <strong style={{ color: '#fff' }}>{liveOffers.length}</strong> surveys
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ArrowUpDown size={14} color="#a5b4fc" />
+                <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>SORT BY:</span>
+                <select
+                  value={fetchSortBy}
+                  onChange={e => setFetchSortBy(e.target.value)}
+                  style={{ ...inputStyle, width: 'auto', padding: '6px 12px', fontSize: '0.78rem', background: '#0f172a', borderColor: 'rgba(99,102,241,0.35)', color: '#a5b4fc', fontWeight: 600 }}
+                >
+                  <option value="amount_desc">🪙 Coins Amount: High → Low</option>
+                  <option value="amount_asc">🪙 Coins Amount: Low → High</option>
+                  <option value="payout_desc">💵 Payout ($ USD): High → Low</option>
+                  <option value="loi_asc">⏱️ Quickest LOI (Short → Long)</option>
+                  <option value="loi_desc">⏱️ Longest LOI (Long → Short)</option>
+                  <option value="ir_desc">🎯 Incidence Rate (IR %): High → Low</option>
+                  <option value="name_asc">🔤 Offer Name: A → Z</option>
+                </select>
+              </div>
             </div>
           )}
 
@@ -630,7 +696,102 @@ export default function OpinionUniversePage({ onNotify }) {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {managedSurveys.map(s => (
+                {/* Search, Filter & Sort Controls */}
+                <div style={{ ...cardStyle, padding: '14px 16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                  {/* Left: Status Filter Pills */}
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {[
+                      { id: 'ALL', label: `All (${managedSurveys.length})` },
+                      { id: 'active', label: `🟢 Active (${managedSurveys.filter(s => s.status === 'active').length})` },
+                      { id: 'inactive', label: `🔴 Disabled (${managedSurveys.filter(s => s.status === 'inactive').length})` },
+                      { id: 'featured', label: `⭐ Featured (${managedSurveys.filter(s => s.is_featured === 1).length})` },
+                    ].map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => setManagedFilterStatus(f.id)}
+                        style={{
+                          background: managedFilterStatus === f.id ? '#6366f1' : 'rgba(255,255,255,0.06)',
+                          color: managedFilterStatus === f.id ? '#fff' : '#94a3b8',
+                          border: '1px solid ' + (managedFilterStatus === f.id ? '#6366f1' : 'rgba(255,255,255,0.1)'),
+                          borderRadius: '8px',
+                          padding: '6px 12px',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Right: Search & Sort Dropdown */}
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end', minWidth: '300px' }}>
+                    <div style={{ position: 'relative', minWidth: '180px', flex: 1, maxWidth: '280px' }}>
+                      <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                      <input
+                        type="text"
+                        placeholder="Search title, ID, country..."
+                        value={managedSearch}
+                        onChange={e => setManagedSearch(e.target.value)}
+                        style={{ ...inputStyle, paddingLeft: '32px', padding: '7px 12px 7px 32px', fontSize: '0.78rem', width: '100%' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <ArrowUpDown size={13} color="#a5b4fc" />
+                      <select
+                        value={managedSortBy}
+                        onChange={e => setManagedSortBy(e.target.value)}
+                        style={{
+                          ...inputStyle,
+                          padding: '7px 10px',
+                          fontSize: '0.78rem',
+                          width: 'auto',
+                          background: '#1e293b',
+                          borderColor: '#6366f1',
+                          color: '#e2e8f0',
+                          fontWeight: 600
+                        }}
+                      >
+                        <option value="featured">⭐ Featured First</option>
+                        <option value="coins_desc">🪙 Coins (High → Low)</option>
+                        <option value="coins_asc">🪙 Coins (Low → High)</option>
+                        <option value="loi_asc">⏱️ LOI (Shortest First)</option>
+                        <option value="loi_desc">⏱️ LOI (Longest First)</option>
+                        <option value="newest">🆕 Newest Added</option>
+                        <option value="oldest">⏳ Oldest Added</option>
+                        <option value="title">🔤 Title (A → Z)</option>
+                      </select>
+                    </div>
+
+                    {(managedSearch || managedFilterStatus !== 'ALL') && (
+                      <button
+                        onClick={() => { setManagedSearch(''); setManagedFilterStatus('ALL'); }}
+                        style={{ ...btnSecondary, padding: '6px 10px', fontSize: '0.75rem', color: '#f87171' }}
+                        title="Clear filters"
+                      >
+                        ✕ Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {filteredManagedSurveys.length === 0 ? (
+                  <div style={{ ...cardStyle, textAlign: 'center', padding: '40px', color: 'var(--text-muted,#64748b)' }}>
+                    <div style={{ fontSize: '1.5rem', marginBottom: '8px' }}>🔍</div>
+                    <div style={{ fontWeight: 700, color: '#e2e8f0', marginBottom: '4px' }}>No surveys match your filters</div>
+                    <div style={{ fontSize: '0.8rem' }}>Try adjusting your search query or status filter.</div>
+                    <button
+                      onClick={() => { setManagedSearch(''); setManagedFilterStatus('ALL'); }}
+                      style={{ ...btnSecondary, marginTop: '12px', fontSize: '0.78rem' }}
+                    >
+                      Reset Filters
+                    </button>
+                  </div>
+                ) : (
+                  filteredManagedSurveys.map(s => (
                   <div key={s.id} style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
                       {s.image_url && <img src={s.image_url} alt="" style={{ width: 52, height: 52, borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} />}
@@ -801,7 +962,8 @@ export default function OpinionUniversePage({ onNotify }) {
                       />
                     )}
                   </div>
-                ))}
+                  ))
+                )}
               </div>
             )
           )}
@@ -1014,17 +1176,41 @@ export default function OpinionUniversePage({ onNotify }) {
               ))}
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1, minWidth: '220px', maxWidth: '400px' }}>
-              <div style={{ position: 'relative', width: '100%' }}>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', flex: 1, minWidth: '280px', justifyContent: 'flex-end' }}>
+              <div style={{ position: 'relative', minWidth: '180px', flex: 1, maxWidth: '280px' }}>
                 <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
                 <input
                   type="text"
                   placeholder="Search User, Click ID, Offer..."
                   value={historySearch}
                   onChange={e => setHistorySearch(e.target.value)}
-                  style={{ ...inputStyle, paddingLeft: '32px', padding: '8px 12px 8px 32px', fontSize: '0.8rem' }}
+                  style={{ ...inputStyle, paddingLeft: '32px', padding: '8px 12px 8px 32px', fontSize: '0.8rem', width: '100%' }}
                 />
               </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <ArrowUpDown size={13} color="#a5b4fc" />
+                <select
+                  value={historySortBy}
+                  onChange={e => setHistorySortBy(e.target.value)}
+                  style={{
+                    ...inputStyle,
+                    padding: '7px 10px',
+                    fontSize: '0.78rem',
+                    width: 'auto',
+                    background: '#1e293b',
+                    borderColor: '#6366f1',
+                    color: '#e2e8f0',
+                    fontWeight: 600
+                  }}
+                >
+                  <option value="date_desc">📅 Newest First</option>
+                  <option value="date_asc">📅 Oldest First</option>
+                  <option value="coins_desc">🪙 Coins (High → Low)</option>
+                  <option value="coins_asc">🪙 Coins (Low → High)</option>
+                </select>
+              </div>
+
               <button onClick={loadClicks} style={{ ...btnSecondary, padding: '8px 12px' }} title="Refresh">
                 <RefreshCw size={14} />
               </button>
