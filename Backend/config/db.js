@@ -186,6 +186,11 @@ async function createTables() {
   `);
 
   try { await mysqlPool.execute(`ALTER TABLE withdrawals ADD COLUMN method VARCHAR(50) DEFAULT 'UPI';`); } catch (e) {}
+  try { await mysqlPool.execute(`ALTER TABLE withdrawals ADD COLUMN gift_card_code VARCHAR(255) DEFAULT NULL;`); } catch (e) {}
+  try { await mysqlPool.execute(`ALTER TABLE withdrawals ADD COLUMN email_sent TINYINT(1) DEFAULT 0;`); } catch (e) {}
+  try { await mysqlPool.execute(`ALTER TABLE withdrawals ADD COLUMN email_sent_to VARCHAR(150) DEFAULT NULL;`); } catch (e) {}
+  try { await mysqlPool.execute(`ALTER TABLE withdrawals ADD COLUMN email_sent_at DATETIME DEFAULT NULL;`); } catch (e) {}
+  try { await mysqlPool.execute(`ALTER TABLE withdrawals ADD COLUMN admin_note TEXT DEFAULT NULL;`); } catch (e) {}
 
   await mysqlPool.execute(`
     CREATE TABLE IF NOT EXISTS platform_settings (

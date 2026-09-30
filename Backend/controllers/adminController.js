@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { notifyWithdrawalApproved, notifyWithdrawalRejected, sendBroadcast } = require('../bot/telegramBot');
+const { sendGiftCardEmail } = require('../config/mailer');
 
 // Helper for Immutable Audit Logging
 async function recordAuditLog({ adminUsername = 'admin', action, targetType, targetId = null, oldValue = null, newValue = null, reason = '', ip = '127.0.0.1' }) {
@@ -844,6 +845,11 @@ async function getWithdrawals(req, res) {
       method: w.method || 'UPI',
       upiId: w.upi_id,
       status: w.status,
+      giftCardCode: w.gift_card_code || null,
+      emailSent: Boolean(w.email_sent),
+      emailSentTo: w.email_sent_to || null,
+      emailSentAt: w.email_sent_at || null,
+      adminNote: w.admin_note || null,
       createdAt: w.created_at
     }));
 
@@ -857,7 +863,7 @@ async function getWithdrawals(req, res) {
 async function processWithdrawal(req, res) {
   try {
     const withdrawalId = req.params.id;
-    const { action, note } = req.body; // 'APPROVE' or 'REJECT'
+    const { action, note, giftCardCode, recipientEmail } = req.body; // 'APPROVE' or 'REJECT'
 
     if (!['APPROVE', 'REJECT'].includes(action)) {
       return res.status(400).json({ error: "Action must be 'APPROVE' or 'REJECT'" });
@@ -874,14 +880,61 @@ async function processWithdrawal(req, res) {
       return res.status(400).json({ error: `Withdrawal is already ${withdrawal.status}` });
     }
 
-    if (action === 'APPROVE') {
-      await db.execute("UPDATE withdrawals SET status = 'APPROVED' WHERE id = ?", [withdrawalId]);
-      console.log(`✅ Approved Withdrawal ID ${withdrawalId} for ₹${(withdrawal.amount / 100).toFixed(2)} to ${withdrawal.upi_id}`);
+    const isAmazon = String(withdrawal.method || '').toUpperCase().includes('AMAZON') ||
+                     String(withdrawal.method || '').toUpperCase().includes('GIFT') ||
+                     String(withdrawal.method || '').toUpperCase().includes('GOOGLE_PLAY');
 
-      // Send Live Telegram Notification to User for Approved Withdrawal
+    if (action === 'APPROVE') {
+      const finalCode = giftCardCode ? String(giftCardCode).trim() : null;
+      let emailSent = 0;
+      const targetEmail = recipientEmail
+        ? String(recipientEmail).trim()
+        : (withdrawal.upi_id && withdrawal.upi_id.includes('@') ? String(withdrawal.upi_id).trim() : null);
+
+      if (isAmazon && !finalCode) {
+        return res.status(400).json({ error: 'Gift Card redeem code is required to approve this withdrawal request.' });
+      }
+
       const users = await db.query('SELECT * FROM users WHERE id = ?', [withdrawal.user_id]);
-      if (users.length > 0) {
-        notifyWithdrawalApproved(users[0].telegram_user_id, (withdrawal.amount / 100).toFixed(2), withdrawal.upi_id, withdrawal.method || 'UPI');
+      const user = users[0] || null;
+
+      // Dispatch Gift Card Email via Zoho SMTP if code and recipient email are available
+      let emailStatusMsg = '';
+      if (finalCode && targetEmail) {
+        try {
+          await sendGiftCardEmail({
+            to: targetEmail,
+            userName: user?.name || 'User',
+            amountInr: (withdrawal.amount / 100).toFixed(2),
+            coins: withdrawal.amount,
+            giftCardCode: finalCode,
+            method: withdrawal.method || 'Amazon Pay Gift Card',
+            adminNote: note || ''
+          });
+          emailSent = 1;
+          emailStatusMsg = ` and Gift Card emailed to ${targetEmail}`;
+        } catch (mailErr) {
+          console.error(`⚠️ Failed to send gift card email for withdrawal #${withdrawalId}:`, mailErr.message);
+          emailStatusMsg = ` (Email delivery notice: ${mailErr.message})`;
+        }
+      }
+
+      await db.execute(
+        `UPDATE withdrawals SET 
+          status = 'APPROVED', 
+          gift_card_code = ?, 
+          email_sent = ?, 
+          email_sent_to = ?, 
+          email_sent_at = ${emailSent ? 'NOW()' : 'NULL'}, 
+          admin_note = ? 
+        WHERE id = ?`,
+        [finalCode, emailSent, targetEmail, note || null, withdrawalId]
+      );
+      console.log(`✅ Approved Withdrawal ID ${withdrawalId} for ₹${(withdrawal.amount / 100).toFixed(2)} (${withdrawal.method}) to ${withdrawal.upi_id}${finalCode ? ` [Code: ${finalCode}]` : ''}`);
+
+      // Send Live Telegram Notification to User for Approved Withdrawal (including voucher code if provided)
+      if (user) {
+        notifyWithdrawalApproved(user.telegram_user_id, (withdrawal.amount / 100).toFixed(2), withdrawal.upi_id, withdrawal.method || 'UPI', finalCode);
       }
 
       await recordAuditLog({
@@ -891,13 +944,13 @@ async function processWithdrawal(req, res) {
         targetId: withdrawalId,
         oldValue: 'PENDING',
         newValue: 'APPROVED',
-        reason: note || `Approved payout of ₹${(withdrawal.amount / 100).toFixed(2)}`,
+        reason: note || `Approved payout of ₹${(withdrawal.amount / 100).toFixed(2)}${finalCode ? ` (Code: ${finalCode})` : ''}`,
         ip: req.clientIp || '127.0.0.1'
       });
 
       return res.json({
         success: true,
-        message: `Withdrawal ID ${withdrawalId} APPROVED successfully! Payout marked as transferred.`
+        message: `Withdrawal ID ${withdrawalId} APPROVED successfully!${emailStatusMsg}`
       });
     } else {
       // REJECT & REFUND COINS TO USER WALLET!

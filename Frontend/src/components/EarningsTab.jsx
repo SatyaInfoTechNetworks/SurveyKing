@@ -49,7 +49,7 @@ export default function EarningsTab({ user, transactions = [], payoutMethods = [
       methodId: 'AMAZON',
       name: 'Amazon Pay Gift Card',
       icon: '🎁',
-      placeholder: 'Enter Email or Mobile Number for Voucher',
+      placeholder: 'Enter Email Address for Gift Card Delivery',
       tiers: [
         { coins: 1000, rupees: 10 },
         { coins: 2500, rupees: 25 },
@@ -584,15 +584,24 @@ export default function EarningsTab({ user, transactions = [], payoutMethods = [
                 </div>
               ) : (
                 <div className="input-group" style={{ marginBottom: '16px' }}>
-                  <label className="input-label" style={{ fontSize: '0.78rem' }}>{activeMethodObj?.name} Destination</label>
+                  <label className="input-label" style={{ fontSize: '0.78rem' }}>
+                    {activeMethodObj?.methodId === 'AMAZON'
+                      ? '📧 Email Address for Gift Card Delivery'
+                      : (activeMethodObj?.methodId === 'GOOGLE_PLAY' ? '📧 Email Address for Code Delivery' : `${activeMethodObj?.name} Destination`)}
+                  </label>
                   <input
-                    type="text"
+                    type={activeMethodObj?.methodId === 'AMAZON' || activeMethodObj?.methodId === 'GOOGLE_PLAY' ? 'email' : 'text'}
                     className="input-field"
                     placeholder={activeMethodObj?.placeholder || 'Enter VPA / Number / Email'}
                     value={accountDetails}
                     onChange={(e) => setAccountDetails(e.target.value)}
                     required
                   />
+                  {(activeMethodObj?.methodId === 'AMAZON' || activeMethodObj?.methodId === 'GOOGLE_PLAY') && (
+                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>
+                      Your gift card voucher code will be emailed to this address upon approval.
+                    </div>
+                  )}
                 </div>
               )}
 

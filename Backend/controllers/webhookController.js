@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { notifySurveyReward, notifySurveyReversal, notifyReferralReward } = require('../bot/telegramBot');
+const { sendOfferwallAlert } = require('../bot/offerwallAlertBot');
 
 async function handleWebhook(req, res) {
   const startTime = Date.now();
@@ -115,6 +116,16 @@ async function handleWebhook(req, res) {
         // Notify user via Telegram about reversal
         notifySurveyReversal(user.telegram_user_id, 'CPX Research Survey', deductionAmt, newBal, 'Canceled / Reversed by Partner');
 
+        // Send Instant Reversal Alert to Admin Bot
+        sendOfferwallAlert({
+          type: 'REVERSAL',
+          user: { name: user.name, username: user.username, telegram_user_id: user.telegram_user_id, id: user.id },
+          offerName: offerId || 'CPX Survey Reversal',
+          offerwall: 'CPX RESEARCH',
+          coins: deductionAmt,
+          transId: transId || 'N/A'
+        }).catch(e => console.warn('Offerwall alert notice:', e.message));
+
         await logPostback({ provider, transId, tgUserId: user.telegram_user_id, offerId, statusParam: 'REVERSED', rawStatus, amountLocal: deductionAmt, amountUsd, clientIp, idempotencyStatus: 'REVERSED', errorReason: 'Chargeback Executed', walletCredited: 0, startTime });
         return res.status(200).send('OK');
       } else if (participation && participation.status === 'REVERSED') {
@@ -175,6 +186,16 @@ async function handleWebhook(req, res) {
 
     // Send Live Telegram Notification for Survey Completion
     notifySurveyReward(user.telegram_user_id, 'CPX Research Survey', rewardAmt, newBalance);
+
+    // Send Instant Offerwall Completion Alert to Admin Bot
+    sendOfferwallAlert({
+      type: 'COMPLETION',
+      user: { name: user.name, username: user.username, telegram_user_id: user.telegram_user_id, id: user.id },
+      offerName: offerId || 'CPX Research Survey',
+      offerwall: 'CPX RESEARCH',
+      coins: rewardAmt,
+      transId: transId || 'N/A'
+    }).catch(e => console.warn('Offerwall alert notice:', e.message));
 
         // ---------------------------------------------------------------
     // 5. REFERRAL QUALIFICATION ENGINE (FIRST SURVEY TRIGGER)
@@ -369,6 +390,16 @@ async function handleTimeWallWebhook(req, res) {
 
       notifySurveyReversal(user.telegram_user_id, coinAmount, newBal, txId);
 
+      // Send Instant Reversal Alert to Admin Bot
+      sendOfferwallAlert({
+        type: 'REVERSAL',
+        user: { name: user.name, username: user.username, telegram_user_id: user.telegram_user_id, id: user.id },
+        offerName: offerName || 'TimeWall Task Reversal',
+        offerwall: 'TIMEWALL',
+        coins: coinAmount,
+        transId: txId || 'N/A'
+      }).catch(e => console.warn('Offerwall alert notice:', e.message));
+
       await logPostback({ provider: 'TimeWall', transId: txId, tgUserId: user.telegram_user_id, offerId: offerName, statusParam: 'CANCELED', rawStatus: rawType, amountLocal: coinAmount, amountUsd: revenueUsd, clientIp, idempotencyStatus: 'REVERSED', errorReason: reason || null, walletCredited: 0, startTime });
       return res.status(200).send('OK');
     }
@@ -393,6 +424,16 @@ async function handleTimeWallWebhook(req, res) {
     );
 
     notifySurveyReward(user.telegram_user_id, coinAmount, newBalance, offerName);
+
+    // Send Instant Offerwall Completion Alert to Admin Bot
+    sendOfferwallAlert({
+      type: 'COMPLETION',
+      user: { name: user.name, username: user.username, telegram_user_id: user.telegram_user_id, id: user.id },
+      offerName: offerName || 'TimeWall Task',
+      offerwall: 'TIMEWALL',
+      coins: coinAmount,
+      transId: txId || 'N/A'
+    }).catch(e => console.warn('Offerwall alert notice:', e.message));
 
     // Referral Qualification Engine
     try {
@@ -481,6 +522,15 @@ async function handleAdsgramWebhook(req, res) {
        VALUES (?, 'AD_REWARD', ?, ?, ?)`,
       [user.id, rewardCoins, `ADSGRAM_AD_${Date.now()}`, `Adsgram Video Ad Watch (+${rewardCoins} Coins)`]
     );
+
+    sendOfferwallAlert({
+      type: 'COMPLETION',
+      user: { name: user.name, username: user.username, telegram_user_id: user.telegram_user_id, id: user.id },
+      offerName: 'Adsgram Video Ad',
+      offerwall: 'ADSGRAM',
+      coins: rewardCoins,
+      transId: `ads_${Date.now()}`
+    }).catch(e => console.warn('Offerwall alert notice:', e.message));
 
     await logPostback({
       provider: 'Adsgram',

@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const https = require('https');
 const http = require('http');
+const { sendOfferwallAlert } = require('../bot/offerwallAlertBot');
 require('dotenv').config();
 
 const OU_PUB_ID = process.env.OU_PUB_ID || '1863';
@@ -438,6 +439,18 @@ async function handlePostback(req, res) {
         [conversionId, clickId, user.id, click.survey_id, providerPayoutVal, -rewardCoins, raw]
       );
       await db.execute('UPDATE survey_clicks SET status = ? WHERE click_id = ?', ['reversed', clickId]);
+
+      // Send Instant Reversal Alert to Admin Bot
+      sendOfferwallAlert({
+        type: 'REVERSAL',
+        user: { name: user.name, username: user.username, telegram_user_id: user.telegram_user_id, id: user.id },
+        offerName: survey?.title || click.external_offer_id || 'Opinion Universe Survey Reversal',
+        offerwall: 'OPINIONUNIVERSE',
+        coins: rewardCoins,
+        transId: conversionId,
+        imageUrl: survey?.image_url || null
+      }).catch(e => console.warn('Offerwall alert notice:', e.message));
+
       return res.status(200).send('1');
     }
 
@@ -467,6 +480,17 @@ async function handlePostback(req, res) {
 
     // Update click status
     await db.execute('UPDATE survey_clicks SET status = ?, completed_at = NOW() WHERE click_id = ?', ['completed', clickId]);
+
+    // Send Instant Offerwall Completion Alert to Admin Bot
+    sendOfferwallAlert({
+      type: 'COMPLETION',
+      user: { name: user.name, username: user.username, telegram_user_id: user.telegram_user_id, id: user.id },
+      offerName: survey?.title || click.external_offer_id || 'Opinion Universe Survey',
+      offerwall: 'OPINIONUNIVERSE',
+      coins: rewardCoins,
+      transId: conversionId,
+      imageUrl: survey?.image_url || null
+    }).catch(e => console.warn('Offerwall alert notice:', e.message));
 
     console.log(`[OU Postback SUCCESS] Credited +${rewardCoins} coins (from PAYOUT param) to User ${user.id} (${user.telegram_user_id}) | Conv: ${conversionId}`);
     return res.status(200).send('1');

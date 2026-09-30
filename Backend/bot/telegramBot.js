@@ -287,13 +287,19 @@ async function notifySurveyReversal(telegramUserId, surveyTitle, deductedCoins, 
 /**
  * Notify user on Telegram when Withdrawal Request is Approved
  */
-async function notifyWithdrawalApproved(telegramUserId, amountRupees, upiId, method = 'UPI') {
+async function notifyWithdrawalApproved(telegramUserId, amountRupees, upiId, method = 'UPI', voucherCode = null) {
   if (!bot || !telegramUserId) return;
-  const message = `✅ *WITHDRAWAL APPROVED & PROCESSED!*\n\n` +
+  let message = `✅ *WITHDRAWAL APPROVED & PROCESSED!*\n\n` +
     `💳 *Method:* ${method}\n` +
     `💵 *Amount:* ₹${parseFloat(amountRupees).toFixed(2)} INR\n` +
-    `📲 *Destination:* \`${upiId}\`\n\n` +
-    `Your payout has been transferred successfully! Thank you for using Survey King 👑`;
+    `📲 *Destination:* \`${upiId}\`\n\n`;
+
+  if (voucherCode) {
+    message += `🎁 *Voucher / Gift Card Code:* \`${voucherCode}\`\n` +
+      `📧 A copy of the voucher and redemption instructions has also been sent to your email!\n\n`;
+  }
+
+  message += `Your payout has been transferred successfully! Thank you for using Survey King 👑`;
 
   try {
     await bot.sendMessage(telegramUserId, message, { parse_mode: 'Markdown' });

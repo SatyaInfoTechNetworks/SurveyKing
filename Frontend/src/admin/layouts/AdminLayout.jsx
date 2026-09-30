@@ -305,13 +305,13 @@ export default function AdminLayout({ onExitAdmin }) {
   };
 
   // Withdrawal Actions
-  const handleProcessWithdrawal = async (withdrawalId, action, note = '') => {
+  const handleProcessWithdrawal = async (withdrawalId, action, note = '', extra = {}) => {
     setProcessingWithdrawalId(withdrawalId);
     try {
       const res = await fetch(`/api/admin/withdrawals/${withdrawalId}/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, note })
+        body: JSON.stringify({ action, note, ...extra })
       });
       const data = await res.json();
       if (data.success) {
