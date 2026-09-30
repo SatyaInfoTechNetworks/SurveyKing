@@ -63,7 +63,7 @@ async function sendOfferwallAlert({
       text += `🖼 Offerwall Image: [View Brand Logo](${imageUrl})\n`;
     }
 
-    text += `\n⚡ Powered by StuEarnIndia\n` +
+    text += `\n⚡ Powered by SurveyKing\n` +
       `🕒 System Log Time: ${systemLogTime}`;
 
     const url = `https://api.telegram.org/bot${ALERT_BOT_TOKEN}/sendMessage`;
